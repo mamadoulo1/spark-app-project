@@ -73,5 +73,8 @@ source = ["src"]
 omit = ["tests/*", "*/migrations/*"]
 
 [tool.coverage.report]
-fail_under = 80
 show_missing = true
+# fail_under retiré d'ici : le seuil de 80% est appliqué uniquement
+# dans le job CI "integration-tests" (pytest tests/ --cov-fail-under=80)
+# qui lance unit + integration ensemble.
+# Si on le laissait ici, il bloquerait aussi les runs unit-only (~70%).
