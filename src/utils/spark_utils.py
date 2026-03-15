@@ -25,8 +25,8 @@ from __future__ import annotations
 from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
 
-from src.utils.config import AppConfig
-from src.utils.logger import get_logger
+from utils.config import AppConfig
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -45,9 +45,9 @@ from typing import Any
 
 from pyspark.sql import SparkSession
 
-from src.utils.config import AppConfig
-from src.utils.logger import get_logger
-from src.utils.spark_utils import get_spark_session, stop_spark_session
+from utils.config import AppConfig
+from utils.logger import get_logger
+from utils.spark_utils import get_spark_session, stop_spark_session
 
 logger = get_logger(__name__)
 

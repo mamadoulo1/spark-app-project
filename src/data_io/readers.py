@@ -37,7 +37,7 @@ from typing import Any
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StructType
 
-from src.utils.logger import get_logger
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

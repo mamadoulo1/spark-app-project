@@ -1,0 +1,25 @@
+# =============================================================================
+# configs/databricks/staging.yml — Surcharges Databricks pour staging
+#
+# Staging = environnement identique à prod mais sur données synthétiques.
+# Sert à valider le pipeline avant de déployer en prod (smoke test).
+# =============================================================================
+
+spark:
+  app_name: spark-project-staging
+  log_level: WARN
+  shuffle_partitions: 16
+
+storage:
+  data_lake_path: "abfss://datalake@storagestagn.dfs.core.windows.net/staging"
+  checkpoint_path: "abfss://datalake@storagestagn.dfs.core.windows.net/staging/checkpoints"
+  raw_zone: raw
+  bronze_zone: bronze
+  silver_zone: silver
+  gold_zone: gold
+
+data_quality:
+  enabled: true
+  fail_on_error: true     # Strict en staging — même comportement que prod
+  null_threshold: 0.05
+  duplicate_threshold: 0.02

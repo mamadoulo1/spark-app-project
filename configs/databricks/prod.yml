@@ -1,0 +1,25 @@
+# =============================================================================
+# configs/databricks/prod.yml — Surcharges Databricks pour la production
+#
+# Production : données réelles, contrôles stricts, cluster plus puissant.
+# Le job est schedulé tous les jours à 06:00 Europe/Paris (databricks.yml).
+# =============================================================================
+
+spark:
+  app_name: spark-project-prod
+  log_level: WARN
+  shuffle_partitions: 200    # Valeur par défaut Spark — optimale sur grand cluster
+
+storage:
+  data_lake_path: "abfss://datalake@storageprod.dfs.core.windows.net/prod"
+  checkpoint_path: "abfss://datalake@storageprod.dfs.core.windows.net/prod/checkpoints"
+  raw_zone: raw
+  bronze_zone: bronze
+  silver_zone: silver
+  gold_zone: gold
+
+data_quality:
+  enabled: true
+  fail_on_error: true     # En prod : le pipeline s'arrête sur toute anomalie DQ
+  null_threshold: 0.02    # Très strict
+  duplicate_threshold: 0.01

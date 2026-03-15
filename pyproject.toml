@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "spark-project"
@@ -25,6 +25,16 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "great-expectations>=0.18.0",
 ]
+
+# ── Entry points (python_wheel_task dans databricks.yml) ──────────────────────
+# Chaque entry_point = une commande CLI installée avec le wheel.
+# Sur Databricks : python_wheel_task { entry_point: "bronze" } appelle
+#                  le script enregistré ici.
+[project.scripts]
+bronze   = "jobs.entrypoints:run_bronze"
+silver   = "jobs.entrypoints:run_silver"
+gold     = "jobs.entrypoints:run_gold"
+dq_report = "jobs.entrypoints:run_dq_report"
 
 [project.optional-dependencies]
 dev = [

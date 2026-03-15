@@ -10,7 +10,7 @@
 #     - Maintenabilite : impossible de savoir "ou est la source de verite" du schema
 #
 #   Avec ce module :
-#     from src.schemas.schemas import RAW_ORDERS_SCHEMA
+#     from schemas.schemas import RAW_ORDERS_SCHEMA
 #     # La definition est a un seul endroit, importee par tous les jobs et tests
 # =============================================================================
 

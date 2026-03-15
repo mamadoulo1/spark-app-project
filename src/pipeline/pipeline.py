@@ -41,9 +41,9 @@ from typing import Type
 
 from pyspark.sql import SparkSession
 
-from src.jobs.base_job import BaseJob, JobMetrics
-from src.utils.config import AppConfig
-from src.utils.logger import get_logger
+from jobs.base_job import BaseJob, JobMetrics
+from utils.config import AppConfig
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 

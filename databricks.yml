@@ -1,0 +1,160 @@
+# =============================================================================
+# databricks.yml — Databricks Asset Bundle (DAB)
+#
+# ETAPE 13 — Databricks Asset Bundles
+#
+# Concept clé : un "bundle" = tout ce dont un job Databricks a besoin
+#   - L'artefact (wheel Python)
+#   - La définition du job (tasks, clusters, schedule)
+#   - Les variables par environnement (dev / staging / prod)
+#
+# Workflow :
+#   databricks bundle validate           # valide le YAML localement (pas de cluster)
+#   databricks bundle deploy --target dev       # déploie sur le workspace dev
+#   databricks bundle run orders_daily_pipeline # déclenche manuellement le job
+#   databricks bundle destroy --target dev      # supprime les ressources déployées
+#
+# Analogie avec notre Pipeline (Etape 11) :
+#   PipelineStep    ↔  task dans le job Databricks
+#   Pipeline.run()  ↔  databricks bundle run
+#   AppConfig       ↔  variables + targets dans ce fichier
+# =============================================================================
+
+bundle:
+  name: spark-orders-pipeline
+
+# ── Variables ─────────────────────────────────────────────────────────────────
+# Valeurs injectées au moment du deploy (CLI, CI secrets, ou .databricks/profiles)
+variables:
+  databricks_host:
+    description: "URL du workspace Databricks"
+    default: "https://dbc-538577ea-c37e.cloud.databricks.com"
+
+  node_type_id:
+    description: "Type de VM pour les workers (AWS : m5.xlarge, i3.xlarge)"
+    default: "m5.xlarge"
+
+  num_workers:
+    description: "Nombre de workers Spark"
+    default: "2"
+
+  notification_email:
+    description: "Email alerté en cas d'échec du job"
+    default: "data-team@company.com"
+
+# ── Artefact ──────────────────────────────────────────────────────────────────
+# Databricks build le wheel depuis setup.py puis l'uploade dans DBFS
+# Equivalent à : python -m build && databricks fs cp dist/*.whl dbfs:/...
+artifacts:
+  spark_project_wheel:
+    type: whl
+    path: .
+    # Override la commande par défaut (python setup.py bdist_wheel utilise le Python système)
+    # On force l'utilisation du venv qui a setuptools + build installés
+    build: "python -m build --wheel --outdir dist/"
+
+# ── Targets (environnements) ──────────────────────────────────────────────────
+#
+# dev     : mode development → suffixe "[dev]" sur les noms, pas de schedule
+# staging : mode development → tests de smoke avant prod
+# prod    : mode production  → schedule actif, plus de workers
+#
+# "mode: development" ajoute automatiquement le username Databricks en préfixe
+# pour éviter les collisions entre développeurs sur le même workspace.
+targets:
+  dev:
+    mode: development
+    default: true   # cible par défaut si --target non spécifié
+    workspace:
+      host: https://dbc-538577ea-c37e.cloud.databricks.com
+
+  staging:
+    mode: development
+    workspace:
+      host: https://dbc-538577ea-c37e.cloud.databricks.com
+    variables:
+      num_workers: "2"
+
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-538577ea-c37e.cloud.databricks.com
+    variables:
+      node_type_id: "m5.2xlarge"
+      num_workers: "4"
+
+# ── Ressources ────────────────────────────────────────────────────────────────
+resources:
+  jobs:
+    orders_daily_pipeline:
+      name: "orders-daily-pipeline [${bundle.target}]"
+      description: >
+        Pipeline medallion Bronze → Silver → Gold pour les commandes quotidiennes.
+        Déployé via Databricks Asset Bundles — bundle: ${bundle.name}.
+
+      # ── Cluster éphémère partagé entre toutes les tâches ─────────────────
+      # job_cluster = créé au début du job, détruit à la fin → plus économique
+      # qu'un cluster interactif (All-Purpose Compute)
+      job_clusters:
+        - job_cluster_key: pipeline_cluster
+          new_cluster:
+            spark_version: "15.4.x-scala2.12"   # Databricks Runtime 15.4 LTS
+            node_type_id: ${var.node_type_id}
+            num_workers: ${var.num_workers}
+            aws_attributes:
+              ebs_volume_type: GENERAL_PURPOSE_SSD
+              ebs_volume_count: 1
+              ebs_volume_size: 32   # Go par volume
+            spark_conf:
+              spark.sql.extensions: "io.delta.sql.DeltaSparkSessionExtension"
+              spark.sql.catalog.spark_catalog: "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+            spark_env_vars:
+              ENVIRONMENT: "${bundle.target}"
+              # Chemin DBFS racine du data lake (accessible depuis les workers Spark)
+              # dbfs:/user/hive/warehouse = chemin accessible depuis SQL Warehouse + clusters
+              # dbfs:/FileStore/ = accessible uniquement aux clusters, pas au SQL Editor
+              DATA_LAKE_PATH: "dbfs:/user/hive/warehouse/spark-project/${bundle.target}"
+              RAW_DATA_PATH: "dbfs:/FileStore/spark-project/${bundle.target}/raw/orders.csv"
+
+      # ── Task unique : pipeline complet Bronze → Silver → Gold ────────────
+      # Les 4 entry points (bronze/silver/gold/dq_report) exécutent tous le
+      # même OrdersEtlJob.run() → conflits Delta si parallélisés.
+      # Architecture propre (multi-jobs distincts) = étape ultérieure.
+      # Pour l'étape 13, un seul task exécute le pipeline de bout en bout.
+      tasks:
+        - task_key: orders_pipeline
+          description: "Pipeline complet : CSV → Bronze → Silver → Gold + DQ"
+          job_cluster_key: pipeline_cluster
+          python_wheel_task:
+            package_name: spark_project
+            entry_point: bronze
+            parameters:
+              - "--env=${bundle.target}"
+          libraries:
+            - whl: ./dist/*.whl
+
+      # ── Schedule (prod uniquement) ─────────────────────────────────────────
+      # En dev/staging : PAUSED → le job tourne uniquement manuellement
+      # En prod        : UNPAUSED → tous les jours à 06:00 heure de Paris
+      # Quartz cron : Sec Min H DOM M DOW [Year]
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: "Europe/Paris"
+        pause_status: PAUSED   # Activer en prod : UNPAUSED
+
+      # ── Retry automatique ──────────────────────────────────────────────────
+      max_concurrent_runs: 1
+
+      # ── Alertes email sur echec ────────────────────────────────────────────
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+
+      # ── Tags pour filtrer dans l'UI Databricks ─────────────────────────────
+      tags:
+        project: spark-orders-pipeline
+        team: data-engineering
+        environment: ${bundle.target}
+        bundle: ${bundle.name}

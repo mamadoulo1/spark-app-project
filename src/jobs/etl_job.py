@@ -17,10 +17,10 @@ from __future__ import annotations
 
 from pyspark.sql import DataFrame, SparkSession
 
-from src.io.readers import create_reader
-from src.io.writers import DeltaWriter
-from src.jobs.base_job import BaseJob
-from src.quality.data_quality import (
+from data_io.readers import create_reader
+from data_io.writers import DeltaWriter
+from jobs.base_job import BaseJob
+from quality.data_quality import (
     AcceptedValuesCheck,
     DataQualityChecker,
     NotNullCheck,
@@ -28,9 +28,9 @@ from src.quality.data_quality import (
     RowCountCheck,
     UniquenessCheck,
 )
-from src.schemas.schemas import RAW_ORDERS_SCHEMA
-from src.transformations.base_transformer import compose
-from src.transformations.data_cleaner import (
+from schemas.schemas import RAW_ORDERS_SCHEMA
+from transformations.base_transformer import compose
+from transformations.data_cleaner import (
     AddAuditColumns,
     CastColumns,
     ComputeDerivedColumns,
@@ -38,8 +38,8 @@ from src.transformations.data_cleaner import (
     DropNullKeys,
     TrimStrings,
 )
-from src.utils.config import AppConfig
-from src.utils.logger import get_logger
+from utils.config import AppConfig
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -71,7 +71,16 @@ class OrdersEtlJob(BaseJob):
         spark: SparkSession | None = None,
     ) -> None:
         super().__init__(config=config, spark=spark)
-        self.source_path = "data/orders.csv"
+        # RAW_DATA_PATH : variable d'env injectée par Databricks (spark_env_vars).
+        # Fallback local : data/orders.csv pour les tests et le dev local.
+        import os
+
+        self.source_path = os.getenv(
+            "RAW_DATA_PATH",
+            self.config.storage.data_lake_path.rstrip("/") + "/raw/orders.csv"
+            if self.config.storage.data_lake_path
+            else "data/orders.csv",
+        )
         self.target_path = self.config.get_zone_path("silver", "orders_v2")
         self.dq_path = self.config.get_zone_path("gold", "dq_results")
 
@@ -149,6 +158,24 @@ class OrdersEtlJob(BaseJob):
             path=self.target_path,
             merge_keys=["order_id"],
         )
+        # Enregistre la table dans hive_metastore.default pour le SQL Editor.
+        # Idempotent : IF NOT EXISTS ne recrée pas si elle existe déjà.
+        # En local (tests) : crée une entrée dans le metastore Derby local, sans impact.
+        # Enregistre dans hive_metastore (compatible DBFS + Unity Catalog activé).
+        # Unity Catalog n'accepte pas dbfs:/ → on cible explicitement hive_metastore.default.
+        # En local (tests) : Derby metastore, la clause hive_metastore. est ignorée.
+        try:
+            self.spark.sql(
+                f"CREATE TABLE IF NOT EXISTS hive_metastore.default.silver_orders "
+                f"USING DELTA LOCATION '{self.target_path}'"
+            )
+        except Exception as e:
+            # Fallback local sans préfixe catalogue (Derby ne supporte pas hive_metastore.)
+            logger.warning("Enregistrement metastore hive_metastore échoué, tentative sans préfixe: %s", e)
+            self.spark.sql(
+                f"CREATE TABLE IF NOT EXISTS default.silver_orders "
+                f"USING DELTA LOCATION '{self.target_path}'"
+            )
         logger.info("Chargement OK", extra={"target": self.target_path})
 
     def run(self) -> None:

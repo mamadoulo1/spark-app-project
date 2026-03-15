@@ -1,0 +1,27 @@
+# =============================================================================
+# configs/databricks/dev.yml — Surcharges Databricks pour l'environnement dev
+#
+# Ce fichier est utilisé par databricks.yml via la variable ${bundle.target}
+# Il surcharge les valeurs par défaut pour le développement sur Databricks
+# (différent de configs/dev.yaml qui est pour le dev local avec Spark local[*])
+# =============================================================================
+
+spark:
+  app_name: spark-project-dev
+  log_level: INFO                  # Plus verbeux qu'en prod pour le débogage
+  shuffle_partitions: 8            # Réduit (prod = 200) — cluster de 2 workers
+
+storage:
+  # En dev Databricks : stockage dans le dossier /dev/ du compte de stockage
+  data_lake_path: "abfss://datalake@storagedev.dfs.core.windows.net/dev"
+  checkpoint_path: "abfss://datalake@storagedev.dfs.core.windows.net/dev/checkpoints"
+  raw_zone: raw
+  bronze_zone: bronze
+  silver_zone: silver
+  gold_zone: gold
+
+data_quality:
+  enabled: true
+  fail_on_error: false    # Permissif en dev pour ne pas bloquer les tests
+  null_threshold: 0.10
+  duplicate_threshold: 0.05

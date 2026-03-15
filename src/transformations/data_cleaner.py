@@ -24,8 +24,8 @@ import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType
 
-from src.transformations.base_transformer import BaseTransformer
-from src.utils.logger import get_logger
+from transformations.base_transformer import BaseTransformer
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
