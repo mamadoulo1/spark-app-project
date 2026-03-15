@@ -249,29 +249,41 @@ jobs:
             -t spark-project:latest \
             .
 
-      # Trivy : scan de vulnerabilites CVE sur l'image Docker
-      # exit-code=1 : bloque le pipeline si une CVE CRITICAL ou HIGH est trouvee
-      # ignore-unfixed=true : ignore les CVE sans correctif disponible
-      # Conditionne sur le succes du build (si build echoue, pas d'image a scanner)
-      - name: Scan for vulnerabilities (Trivy)
+      # Trivy : installation via APT (plus fiable que l'action qui telecharge un binaire dynamique)
+      # La trivy-action@0.28.0 echoue parfois sur le telechargement du binaire en CI
+      - name: Install Trivy
         if: steps.docker-build.outcome == 'success'
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: spark-project:${{ github.sha }}
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: CRITICAL,HIGH
+        run: |
+          sudo apt-get install -y wget apt-transport-https gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update && sudo apt-get install -y trivy
 
-      # Sauvegarde le rapport Trivy au format SARIF pour l'onglet Security de GitHub
-      # Conditionne sur le succes du build pour eviter "Path does not exist: trivy-results.sarif"
+      # Scan table : bloque le pipeline si CVE CRITICAL ou HIGH sans correctif
+      - name: Scan for vulnerabilities (Trivy table)
+        if: steps.docker-build.outcome == 'success'
+        run: |
+          trivy image \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            --format table \
+            spark-project:${{ github.sha }}
+
+      # Scan SARIF : rapport pour l'onglet Security de GitHub (ne bloque pas)
       - name: Trivy scan (SARIF for GitHub Security tab)
         if: steps.docker-build.outcome == 'success'
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: spark-project:${{ github.sha }}
-          format: sarif
-          output: trivy-results.sarif
+        run: |
+          trivy image \
+            --exit-code 0 \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            --format sarif \
+            --output trivy-results.sarif \
+            spark-project:${{ github.sha }}
 
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v3
