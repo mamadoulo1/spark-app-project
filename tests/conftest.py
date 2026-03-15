@@ -18,10 +18,10 @@ os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 os.environ.setdefault("SPARK_LOCAL_IP", "127.0.0.1")
 os.environ.setdefault("HADOOP_HOME", r"C:\hadoop")
 
-import pytest
-from pyspark.sql import SparkSession
+import pytest  # noqa: E402
+from pyspark.sql import SparkSession  # noqa: E402
 
-from src.utils.spark_utils import get_spark_session
+from src.utils.spark_utils import get_spark_session  # noqa: E402
 
 
 @pytest.fixture(scope="session")

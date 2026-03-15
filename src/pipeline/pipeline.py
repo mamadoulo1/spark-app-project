@@ -174,7 +174,8 @@ class PipelineReport:
             dq = "-"
             if r.metrics:
                 rows = str(r.metrics.rows_written)
-                dq = f"{r.metrics.dq_checks_passed}/{r.metrics.dq_checks_passed + r.metrics.dq_checks_failed}"
+                total = r.metrics.dq_checks_passed + r.metrics.dq_checks_failed
+                dq = f"{r.metrics.dq_checks_passed}/{total}"
 
             status_display = r.status.value
             print(f"  {r.step_name:<28}  {status_display:<8}  {rows:>7}  {dq:>6}")
