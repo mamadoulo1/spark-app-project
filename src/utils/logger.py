@@ -164,7 +164,7 @@ class TextFormatter(logging.Formatter):
         return line
 
 
-def get_logger(name: str, level: str = None) -> logging.Logger:
+def get_logger(name: str, level: str | None = None) -> logging.Logger:
     """
     Cree ou recupere un logger configure pour ce projet.
 

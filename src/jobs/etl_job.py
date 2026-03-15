@@ -15,10 +15,10 @@
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
 
 from src.io.readers import create_reader
-from src.io.writers import create_writer
+from src.io.writers import DeltaWriter
 from src.jobs.base_job import BaseJob
 from src.quality.data_quality import (
     AcceptedValuesCheck,
@@ -38,6 +38,7 @@ from src.transformations.data_cleaner import (
     DropNullKeys,
     TrimStrings,
 )
+from src.utils.config import AppConfig
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -64,7 +65,11 @@ class OrdersEtlJob(BaseJob):
 
     JOB_NAME = "orders_etl"
 
-    def __init__(self, config=None, spark=None):
+    def __init__(
+        self,
+        config: AppConfig | None = None,
+        spark: SparkSession | None = None,
+    ) -> None:
         super().__init__(config=config, spark=spark)
         self.source_path = "data/orders.csv"
         self.target_path = self.config.get_zone_path("silver", "orders_v2")
@@ -139,7 +144,7 @@ class OrdersEtlJob(BaseJob):
             checker.assert_no_failures()
 
     def _load(self, df: DataFrame) -> None:
-        create_writer(self.spark, "delta").upsert(
+        DeltaWriter(self.spark).upsert(
             df=df,
             path=self.target_path,
             merge_keys=["order_id"],

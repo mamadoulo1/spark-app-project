@@ -101,7 +101,7 @@ def get_spark_session(
     spark.sparkContext.setLogLevel(config.spark.log_level)
 
     # Silencer le ShutdownHookManager (message d'erreur cosmétique sur Windows)
-    log4j = spark.sparkContext._jvm.org.apache.log4j
+    log4j = spark.sparkContext._jvm.org.apache.log4j  # type: ignore[union-attr]
     log4j.LogManager.getLogger("org.apache.spark.util.ShutdownHookManager").setLevel(
         log4j.Level.OFF
     )

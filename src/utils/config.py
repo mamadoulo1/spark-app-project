@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
 from src.utils.logger import get_logger
@@ -121,7 +121,7 @@ class AppConfig:
         # Charger le fichier .env sans ecraser les variables shell existantes
         load_dotenv(override=False)
 
-        resolved_env = env or os.getenv("ENV", "dev")
+        resolved_env = env or os.getenv("ENV", "dev") or "dev"
         config_path = Path(__file__).parents[2] / "configs" / f"{resolved_env}.yaml"
 
         logger.debug(

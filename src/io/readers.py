@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import StructType
@@ -53,7 +54,7 @@ class BaseReader(ABC):
         self.spark = spark
 
     @abstractmethod
-    def read(self, path: str, **kwargs) -> DataFrame:
+    def read(self, path: str, **kwargs: Any) -> DataFrame:
         """Lit les donnees depuis path et retourne un DataFrame."""
 
 
@@ -85,7 +86,7 @@ class ParquetReader(BaseReader):
         path: str,
         schema: StructType | None = None,
         merge_schema: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> DataFrame:
         reader = self.spark.read.option("mergeSchema", str(merge_schema).lower())
         if schema:
@@ -128,7 +129,7 @@ class CsvReader(BaseReader):
         path: str,
         schema: StructType | None = None,
         sep: str = ",",
-        **kwargs,
+        **kwargs: Any,
     ) -> DataFrame:
         reader = (
             self.spark.read.option("header", "true")
@@ -171,7 +172,7 @@ class JsonReader(BaseReader):
         path: str,
         schema: StructType | None = None,
         multiline: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> DataFrame:
         reader = self.spark.read.option("multiline", str(multiline).lower())
         for key, value in kwargs.items():
@@ -218,7 +219,7 @@ class DeltaReader(BaseReader):
         path: str,
         version: int | None = None,
         timestamp: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> DataFrame:
         reader = self.spark.read.format("delta")
         if version is not None:

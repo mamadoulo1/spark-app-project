@@ -34,6 +34,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from pyspark.sql import DataFrame, SparkSession
 
@@ -58,7 +59,7 @@ class BaseWriter(ABC):
         self,
         df: DataFrame,
         path: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Ecrit df dans path."""
 
@@ -92,7 +93,7 @@ class ParquetWriter(BaseWriter):
         path: str,
         mode: str = "overwrite",
         partition_by: list[str] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         writer = df.write.mode(mode)
         if partition_by:
@@ -127,7 +128,7 @@ class DeltaWriter(BaseWriter):
         path: str,
         mode: str = "append",
         partition_by: list[str] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         Ecriture Delta standard (append ou overwrite).
