@@ -34,8 +34,10 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
     ENV=prod
 
 # Install Java (required by PySpark) + tini for proper signal handling
+# default-jre-headless = alias portable vers OpenJDK 17 sur Debian Bookworm/Ubuntu Jammy
+# Plus fiable que openjdk-17-jre-headless en CI (toujours dans les dépôts par défaut)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-17-jre-headless \
+    default-jre-headless \
     tini \
     && rm -rf /var/lib/apt/lists/*
 

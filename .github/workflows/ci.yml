@@ -240,6 +240,7 @@ jobs:
       # --build-arg : injecte des metadonnees dans l'image (labels OCI standard)
       # github.sha : hash du commit -> tracabilite image <-> commit
       - name: Build Docker image
+        id: docker-build
         run: |
           docker build \
             --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
@@ -251,7 +252,9 @@ jobs:
       # Trivy : scan de vulnerabilites CVE sur l'image Docker
       # exit-code=1 : bloque le pipeline si une CVE CRITICAL ou HIGH est trouvee
       # ignore-unfixed=true : ignore les CVE sans correctif disponible
+      # Conditionne sur le succes du build (si build echoue, pas d'image a scanner)
       - name: Scan for vulnerabilities (Trivy)
+        if: steps.docker-build.outcome == 'success'
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: spark-project:${{ github.sha }}
@@ -261,9 +264,10 @@ jobs:
           severity: CRITICAL,HIGH
 
       # Sauvegarde le rapport Trivy au format SARIF pour l'onglet Security de GitHub
+      # Conditionne sur le succes du build pour eviter "Path does not exist: trivy-results.sarif"
       - name: Trivy scan (SARIF for GitHub Security tab)
+        if: steps.docker-build.outcome == 'success'
         uses: aquasecurity/trivy-action@0.28.0
-        if: always()
         with:
           image-ref: spark-project:${{ github.sha }}
           format: sarif
@@ -271,6 +275,6 @@ jobs:
 
       - name: Upload Trivy SARIF
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: steps.docker-build.outcome == 'success'
         with:
           sarif_file: trivy-results.sarif
