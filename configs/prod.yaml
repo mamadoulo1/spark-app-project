@@ -1,0 +1,51 @@
+# =============================================================================
+# configs/prod.yaml — Environnement de production
+#
+# Caracteristiques :
+#   - Cluster YARN avec allocation dynamique (jusqu'a 100 executeurs)
+#   - Chemins S3 production
+#   - Controles qualite tres stricts (null_threshold: 0.01)
+#   - Timeouts reseau augmentes pour les gros jobs
+# =============================================================================
+
+spark:
+  app_name: spark-project
+  master: yarn
+  log_level: WARN
+  shuffle_partitions: 200
+  default_parallelism: 200
+  adaptive_query_execution: true
+  dynamic_allocation_enabled: true
+  extra_configs:
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.databricks.delta.optimizeWrite.enabled: "true"
+    spark.databricks.delta.autoCompact.enabled: "true"
+    spark.dynamicAllocation.enabled: "true"
+    spark.dynamicAllocation.minExecutors: "5"
+    spark.dynamicAllocation.maxExecutors: "100"
+    spark.sql.broadcastTimeout: "600"
+    spark.network.timeout: "800s"
+    spark.executor.heartbeatInterval: "60s"
+
+storage:
+  data_lake_path: s3a://your-company-prod/datalake
+  checkpoint_path: s3a://your-company-prod/checkpoints
+  raw_zone: raw
+  bronze_zone: bronze
+  silver_zone: silver
+  gold_zone: gold
+  format: delta
+  partition_overwrite_mode: dynamic
+
+data_quality:
+  enabled: true
+  fail_on_error: true
+  null_threshold: 0.01
+  duplicate_threshold: 0.001
+  results_path: s3a://your-company-prod/datalake/gold/dq_results
+
+monitoring:
+  enabled: true
+  metrics_enabled: true
+  slack_webhook_url: ""
+  alert_email: data-team@company.com

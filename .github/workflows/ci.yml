@@ -1,0 +1,268 @@
+# =============================================================================
+# .github/workflows/ci.yml
+#
+# ETAPE 12 — CI/CD avec GitHub Actions
+#
+# On apprend :
+#   - Triggers          : quand la CI se declenche (push / PR)
+#   - Job DAG           : dependances entre jobs (needs:) — meme concept que notre Pipeline !
+#   - Cache pip         : ne pas re-telecharger PySpark (500 MB) a chaque run
+#   - Spark env vars    : PYSPARK_PYTHON + SPARK_LOCAL_IP pour PySpark sur Ubuntu
+#   - Coverage seuil    : cov-fail-under=80 bloque le merge si couverture insuffisante
+#   - Codecov           : rapport de couverture visible sur chaque PR
+#   - Docker            : build + scan de vulnerabilites Trivy
+#   - Concurrency       : annule les runs precedents sur la meme branche (economie de minutes)
+#
+# DAG du workflow CI (analogie directe avec le Pipeline DAG du Step 11) :
+#
+#   [quality] -> [unit-tests] -> [integration-tests] -> [docker-build]
+#
+#   quality       : black, isort, flake8, mypy  (pas besoin de Java)
+#   unit-tests    : pytest tests/unit            (SparkSession locale)
+#   integration-tests : pytest tests/integration (SparkSession + Delta)
+#   docker-build  : build image + scan Trivy
+#
+#   Comme PipelineStep.dependencies :
+#     integration-tests ne tourne pas si unit-tests a echoue
+#     docker-build      ne tourne pas si integration-tests a echoue
+# =============================================================================
+
+name: CI Pipeline
+
+# Declencheurs : sur push ou PR vers main/develop
+# En production : ajouter workflow_dispatch pour les lancements manuels
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  # Permet de lancer le workflow manuellement depuis l'onglet "Actions" de GitHub
+  workflow_dispatch:
+
+# Concurrency : annule les runs precedents sur la meme branche/PR
+# Sans ca, 3 pushes rapides = 3 runs en parallele = gaspillage de minutes CI
+# group = identifiant unique par branche/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Variables partagees par tous les jobs
+env:
+  PYTHON_VERSION: "3.11"
+  JAVA_VERSION: "17"
+  COV_MIN: 80        # Couverture minimale : le job echoue si < 80%
+
+jobs:
+
+  # ── Job 1 : Qualite du code ───────────────────────────────────────────────
+  # Pas besoin de Java/Spark : verification statique uniquement.
+  # Lance en premier pour echouer rapidement si le code n'est pas formate.
+  # "Fail fast" : meme principe que notre Pipeline.
+  quality:
+    name: "Code Quality (black · isort · flake8 · mypy)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip   # Cache : pip telecharge les packages 1x, reutilise ensuite
+                       # Sans cache : ~2 min pour PySpark+Delta a chaque run
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      # black : verifie le formatage sans modifier le code (--check)
+      # Si non formate -> exit code 1 -> job echoue -> PR bloquee
+      - name: Check formatting (black)
+        run: black --check src tests --line-length=100
+
+      # isort : l'ordre des imports doit etre coherent avec black
+      - name: Check import order (isort)
+        run: isort --check-only src tests --profile=black
+
+      # flake8 : detecte les erreurs de style et bugs potentiels
+      - name: Lint (flake8)
+        run: flake8 src tests --max-line-length=100 --extend-ignore=E203,W503
+
+      # mypy : verifie les annotations de type statiquement
+      # --ignore-missing-imports : PySpark n'a pas de stubs complets
+      - name: Type check (mypy)
+        run: mypy src --ignore-missing-imports
+
+  # ── Job 2 : Tests unitaires ──────────────────────────────────────────────
+  # needs: quality -> ne tourne que si quality a reussi (DAG CI)
+  # Java requis : PySpark lance une JVM meme en mode local
+  unit-tests:
+    name: "Unit Tests (pytest · coverage)"
+    runs-on: ubuntu-latest
+    needs: quality   # Dependance DAG : quality doit etre OK avant les tests
+
+    # Variables d'environnement Spark pour CI Ubuntu
+    # Sans PYSPARK_PYTHON : les workers Python echouent avec "connection refused"
+    # Sans SPARK_LOCAL_IP : Spark essaie de binder sur l'adresse Docker -> timeout
+    # Note : HADOOP_HOME n'est pas necessaire sur Ubuntu (contrairement a Windows)
+    env:
+      PYSPARK_PYTHON: python3
+      PYSPARK_DRIVER_PYTHON: python3
+      SPARK_LOCAL_IP: 127.0.0.1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Java est requis par PySpark (la JVM fait tourner le moteur Spark)
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin    # Eclipse Temurin = distribution OpenJDK de reference
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      # --cov-fail-under : le job echoue si coverage < 80%
+      # Garantit que chaque PR maintient la qualite des tests
+      - name: Run unit tests
+        run: |
+          pytest tests/unit -v -m unit \
+            --cov=src \
+            --cov-report=xml:coverage-unit.xml \
+            --cov-fail-under=${{ env.COV_MIN }}
+
+      # Sauvegarde le rapport XML comme artifact GitHub
+      # Accessible 7 jours dans l'onglet "Actions > Summary > Artifacts"
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-unit
+          path: coverage-unit.xml
+          retention-days: 7
+
+      # Upload vers Codecov : rapport visible sur chaque PR
+      # Necessite CODECOV_TOKEN dans Settings > Secrets > Actions
+      # flags=unit : distingue la couverture unit vs integration dans le dashboard
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          files: coverage-unit.xml
+          flags: unit
+
+  # ── Job 3 : Tests d'integration ──────────────────────────────────────────
+  # needs: unit-tests -> lance seulement apres les tests unitaires (DAG CI)
+  # Plus longs : SparkSession reelle + Delta Lake + MERGE (~2-5 min)
+  integration-tests:
+    name: "Integration Tests (Spark + Delta)"
+    runs-on: ubuntu-latest
+    needs: unit-tests   # Dependance DAG
+
+    env:
+      PYSPARK_PYTHON: python3
+      PYSPARK_DRIVER_PYTHON: python3
+      SPARK_LOCAL_IP: 127.0.0.1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v -m integration \
+            --cov=src \
+            --cov-report=xml:coverage-integration.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-integration
+          path: coverage-integration.xml
+          retention-days: 7
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          files: coverage-integration.xml
+          flags: integration   # Distingue la couverture integration dans Codecov
+
+  # ── Job 4 : Build Docker + scan securite ─────────────────────────────────
+  # needs: integration-tests -> le build Docker ne tourne que si TOUS les tests passent
+  # En production : apres ce job on ajouterait un push vers ECR/ACR/Docker Hub
+  docker-build:
+    name: "Docker Build + Trivy Security Scan"
+    runs-on: ubuntu-latest
+    needs: integration-tests   # Dependance DAG : pas de build si les tests echouent
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --build-arg : injecte des metadonnees dans l'image (labels OCI standard)
+      # github.sha : hash du commit -> tracabilite image <-> commit
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --build-arg VCS_REF=${{ github.sha }} \
+            -t spark-project:${{ github.sha }} \
+            -t spark-project:latest \
+            .
+
+      # Trivy : scan de vulnerabilites CVE sur l'image Docker
+      # exit-code=1 : bloque le pipeline si une CVE CRITICAL ou HIGH est trouvee
+      # ignore-unfixed=true : ignore les CVE sans correctif disponible
+      - name: Scan for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: spark-project:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      # Sauvegarde le rapport Trivy au format SARIF pour l'onglet Security de GitHub
+      - name: Trivy scan (SARIF for GitHub Security tab)
+        uses: aquasecurity/trivy-action@0.28.0
+        if: always()
+        with:
+          image-ref: spark-project:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif

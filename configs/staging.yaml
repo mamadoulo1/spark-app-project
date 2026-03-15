@@ -1,0 +1,49 @@
+# =============================================================================
+# configs/staging.yaml — Environnement de validation (pre-production)
+#
+# Utilise pour valider les jobs avant la mise en production.
+# Caracteristiques :
+#   - Cluster YARN reel (meme infra que prod, donnees anonymisees)
+#   - Chemins S3 staging
+#   - Controles qualite stricts (fail_on_error: true)
+#   - Alertes activees
+# =============================================================================
+
+spark:
+  app_name: spark-project-staging
+  master: yarn
+  log_level: WARN
+  shuffle_partitions: 100
+  default_parallelism: 100
+  adaptive_query_execution: true
+  dynamic_allocation_enabled: true
+  extra_configs:
+    spark.sql.sources.partitionOverwriteMode: dynamic
+    spark.databricks.delta.optimizeWrite.enabled: "true"
+    spark.databricks.delta.autoCompact.enabled: "true"
+    spark.dynamicAllocation.enabled: "true"
+    spark.dynamicAllocation.minExecutors: "2"
+    spark.dynamicAllocation.maxExecutors: "20"
+
+storage:
+  data_lake_path: s3a://your-company-staging/datalake
+  checkpoint_path: s3a://your-company-staging/checkpoints
+  raw_zone: raw
+  bronze_zone: bronze
+  silver_zone: silver
+  gold_zone: gold
+  format: delta
+  partition_overwrite_mode: dynamic
+
+data_quality:
+  enabled: true
+  fail_on_error: true
+  null_threshold: 0.02
+  duplicate_threshold: 0.005
+  results_path: s3a://your-company-staging/datalake/gold/dq_results
+
+monitoring:
+  enabled: true
+  metrics_enabled: true
+  slack_webhook_url: ""
+  alert_email: data-team@company.com

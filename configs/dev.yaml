@@ -1,0 +1,31 @@
+# =============================================================================
+# configs/dev.yaml — Environnement de developpement local
+#
+# Utilise sur la machine du developpeur.
+# Caracteristiques :
+#   - Spark local (pas de cluster, tous les coeurs disponibles)
+#   - Chemins locaux (data/lake/)
+#   - Controles qualite permissifs (fail_on_error: false)
+#   - shuffle_partitions reduit (4 au lieu de 200 : 1 seul noeud)
+# =============================================================================
+
+spark:
+  app_name: spark-project-dev
+  master: local[*]           # tous les coeurs disponibles en local
+  log_level: WARN
+  shuffle_partitions: 4      # 200 en prod, 4 suffisent en local (1 noeud)
+  adaptive_query_execution: true
+
+storage:
+  data_lake_path: data/lake  # chemin local relatif au projet
+  checkpoint_path: data/checkpoints
+  raw_zone: raw
+  bronze_zone: bronze
+  silver_zone: silver
+  gold_zone: gold
+
+data_quality:
+  enabled: true
+  fail_on_error: false       # ne pas bloquer en dev sur des donnees de test
+  null_threshold: 0.10       # plus permissif qu'en prod
+  duplicate_threshold: 0.05
