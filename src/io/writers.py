@@ -46,6 +46,7 @@ logger = get_logger(__name__)
 # BaseWriter — contrat abstrait
 # =============================================================================
 
+
 class BaseWriter(ABC):
     """Contrat abstrait pour tous les writers."""
 
@@ -55,7 +56,7 @@ class BaseWriter(ABC):
     @abstractmethod
     def write(
         self,
-        df:   DataFrame,
+        df: DataFrame,
         path: str,
         **kwargs,
     ) -> None:
@@ -65,6 +66,7 @@ class BaseWriter(ABC):
 # =============================================================================
 # ParquetWriter
 # =============================================================================
+
 
 class ParquetWriter(BaseWriter):
     """
@@ -86,9 +88,9 @@ class ParquetWriter(BaseWriter):
 
     def write(
         self,
-        df:           DataFrame,
-        path:         str,
-        mode:         str = "overwrite",
+        df: DataFrame,
+        path: str,
+        mode: str = "overwrite",
         partition_by: list[str] | None = None,
         **kwargs,
     ) -> None:
@@ -103,6 +105,7 @@ class ParquetWriter(BaseWriter):
 # =============================================================================
 # DeltaWriter
 # =============================================================================
+
 
 class DeltaWriter(BaseWriter):
     """
@@ -120,9 +123,9 @@ class DeltaWriter(BaseWriter):
 
     def write(
         self,
-        df:           DataFrame,
-        path:         str,
-        mode:         str = "append",
+        df: DataFrame,
+        path: str,
+        mode: str = "append",
         partition_by: list[str] | None = None,
         **kwargs,
     ) -> None:
@@ -140,9 +143,9 @@ class DeltaWriter(BaseWriter):
 
     def upsert(
         self,
-        df:             DataFrame,
-        path:           str,
-        merge_keys:     list[str],
+        df: DataFrame,
+        path: str,
+        merge_keys: list[str],
         update_columns: list[str] | None = None,
     ) -> None:
         """
@@ -179,14 +182,9 @@ class DeltaWriter(BaseWriter):
         from delta.tables import DeltaTable
 
         # Condition de jointure : target.key = source.key pour chaque cle
-        merge_condition = " AND ".join(
-            f"target.{k} = source.{k}" for k in merge_keys
-        )
+        merge_condition = " AND ".join(f"target.{k} = source.{k}" for k in merge_keys)
 
-        logger.info(
-            "Upsert Delta (MERGE)",
-            extra={"path": path, "merge_keys": merge_keys}
-        )
+        logger.info("Upsert Delta (MERGE)", extra={"path": path, "merge_keys": merge_keys})
 
         if DeltaTable.isDeltaTable(self.spark, path):
             # La table existe -> MERGE
@@ -194,23 +192,15 @@ class DeltaWriter(BaseWriter):
             merge_builder = (
                 delta_table.alias("target")
                 .merge(df.alias("source"), merge_condition)
-                .whenMatchedUpdateAll()      # mise a jour de toutes les colonnes
-                .whenNotMatchedInsertAll()   # insertion si nouvelle ligne
+                .whenMatchedUpdateAll()  # mise a jour de toutes les colonnes
+                .whenNotMatchedInsertAll()  # insertion si nouvelle ligne
             )
             merge_builder.execute()
             logger.info("MERGE Delta termine", extra={"path": path})
         else:
             # Premiere ecriture : creer la table Delta
-            logger.info(
-                "Table Delta absente, creation par ecriture initiale",
-                extra={"path": path}
-            )
-            (
-                df.write
-                .format("delta")
-                .mode("overwrite")
-                .save(path)
-            )
+            logger.info("Table Delta absente, creation par ecriture initiale", extra={"path": path})
+            (df.write.format("delta").mode("overwrite").save(path))
             logger.info("Table Delta creee", extra={"path": path})
 
 
@@ -220,7 +210,7 @@ class DeltaWriter(BaseWriter):
 
 _WRITER_REGISTRY: dict[str, type[BaseWriter]] = {
     "parquet": ParquetWriter,
-    "delta":   DeltaWriter,
+    "delta": DeltaWriter,
 }
 
 

@@ -56,6 +56,7 @@ logger = get_logger(__name__)
 # JobMetrics — accumulateur de metriques d'execution
 # =============================================================================
 
+
 class JobMetrics:
     """
     Accumule les metriques de runtime pour une execution de job.
@@ -70,14 +71,14 @@ class JobMetrics:
     """
 
     def __init__(self) -> None:
-        self.start_time:        float = 0.0
-        self.end_time:          float = 0.0
-        self.rows_read:         int   = 0
-        self.rows_written:      int   = 0
-        self.rows_dropped:      int   = 0
-        self.dq_checks_passed:  int   = 0
-        self.dq_checks_failed:  int   = 0
-        self.extra: dict[str, Any]    = {}   # metriques personnalisees
+        self.start_time: float = 0.0
+        self.end_time: float = 0.0
+        self.rows_read: int = 0
+        self.rows_written: int = 0
+        self.rows_dropped: int = 0
+        self.dq_checks_passed: int = 0
+        self.dq_checks_failed: int = 0
+        self.extra: dict[str, Any] = {}  # metriques personnalisees
 
     @property
     def elapsed_seconds(self) -> float:
@@ -87,10 +88,10 @@ class JobMetrics:
     def to_dict(self) -> dict[str, Any]:
         """Serialise les metriques en dict pour le logging et le monitoring."""
         return {
-            "elapsed_seconds":  self.elapsed_seconds,
-            "rows_read":        self.rows_read,
-            "rows_written":     self.rows_written,
-            "rows_dropped":     self.rows_dropped,
+            "elapsed_seconds": self.elapsed_seconds,
+            "rows_read": self.rows_read,
+            "rows_written": self.rows_written,
+            "rows_dropped": self.rows_dropped,
             "dq_checks_passed": self.dq_checks_passed,
             "dq_checks_failed": self.dq_checks_failed,
             **self.extra,
@@ -100,6 +101,7 @@ class JobMetrics:
 # =============================================================================
 # BaseJob — classe abstraite, parent de tous les jobs
 # =============================================================================
+
 
 class BaseJob(ABC):
     """
@@ -133,8 +135,8 @@ class BaseJob(ABC):
 
     def __init__(
         self,
-        config:  AppConfig    | None = None,
-        spark:   SparkSession | None = None,
+        config: AppConfig | None = None,
+        spark: SparkSession | None = None,
     ) -> None:
         """
         Args:
@@ -144,10 +146,10 @@ class BaseJob(ABC):
                      elle ne sera PAS arretee par execute(). C'est votre
                      responsabilite de l'arreter.
         """
-        self.config      = config or AppConfig.from_env()
-        self._spark      = spark
-        self.metrics     = JobMetrics()
-        self._owns_spark = spark is None   # True = on a cree la session, on doit l'arreter
+        self.config = config or AppConfig.from_env()
+        self._spark = spark
+        self.metrics = JobMetrics()
+        self._owns_spark = spark is None  # True = on a cree la session, on doit l'arreter
 
     @property
     def spark(self) -> SparkSession:
@@ -201,10 +203,10 @@ class BaseJob(ABC):
         logger.error(
             "Job echoue",
             extra={
-                "job":       self.JOB_NAME,
-                "error":     str(exc),
+                "job": self.JOB_NAME,
+                "error": str(exc),
                 "traceback": traceback.format_exc(),
-            }
+            },
         )
 
     # ------------------------------------------------------------------
@@ -229,10 +231,7 @@ class BaseJob(ABC):
         Returns:
             JobMetrics avec timing et comptages de lignes.
         """
-        logger.info(
-            "Job demarre",
-            extra={"job": self.JOB_NAME, "env": self.config.env}
-        )
+        logger.info("Job demarre", extra={"job": self.JOB_NAME, "env": self.config.env})
         self.metrics.start_time = time.monotonic()
 
         try:
@@ -243,13 +242,13 @@ class BaseJob(ABC):
 
             logger.info(
                 "Job termine avec succes",
-                extra={"job": self.JOB_NAME, "metrics": self.metrics.to_dict()}
+                extra={"job": self.JOB_NAME, "metrics": self.metrics.to_dict()},
             )
 
         except Exception as exc:
             self.metrics.end_time = time.monotonic()
             self.on_failure(exc)
-            raise   # on re-leve l'exception pour que l'orchestrateur la voie
+            raise  # on re-leve l'exception pour que l'orchestrateur la voie
 
         finally:
             # Arreter la session UNIQUEMENT si on l'a creee nous-memes

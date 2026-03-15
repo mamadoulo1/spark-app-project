@@ -68,7 +68,7 @@ class OrdersEtlJob(BaseJob):
         super().__init__(config=config, spark=spark)
         self.source_path = "data/orders.csv"
         self.target_path = self.config.get_zone_path("silver", "orders_v2")
-        self.dq_path     = self.config.get_zone_path("gold", "dq_results")
+        self.dq_path = self.config.get_zone_path("gold", "dq_results")
 
     # ------------------------------------------------------------------
     # Methodes publiques — utilisees par les tests et les orchestrateurs
@@ -110,10 +110,12 @@ class OrdersEtlJob(BaseJob):
             DropDuplicates(subset=["order_id"]),
             DropNullKeys(key_columns=["order_id", "customer_id"]),
             CastColumns({"quantity": "integer", "unit_price": "decimal(18,4)"}),
-            ComputeDerivedColumns({
-                "total_amount": "ROUND(CAST(quantity AS DECIMAL(18,4)) * unit_price, 2)",
-                "status":       "UPPER(COALESCE(status, 'UNKNOWN'))",
-            }),
+            ComputeDerivedColumns(
+                {
+                    "total_amount": "ROUND(CAST(quantity AS DECIMAL(18,4)) * unit_price, 2)",
+                    "status": "UPPER(COALESCE(status, 'UNKNOWN'))",
+                }
+            ),
             AddAuditColumns(pipeline_name=self.JOB_NAME, env=self.config.env),
         )(df)
         self.metrics.rows_written = result.count()
@@ -145,7 +147,7 @@ class OrdersEtlJob(BaseJob):
         logger.info("Chargement OK", extra={"target": self.target_path})
 
     def run(self) -> None:
-        df_raw    = self._extract()
+        df_raw = self._extract()
         df_silver = self._transform(df_raw)
         self._validate(df_silver)
         self._load(df_silver)

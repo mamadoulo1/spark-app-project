@@ -25,13 +25,19 @@ from pyspark.sql.types import (
 
 # Schema brut des commandes (zone Raw / Bronze)
 # Correspond au CSV source : data/orders.csv
-RAW_ORDERS_SCHEMA = StructType([
-    StructField("order_id",    StringType(),       nullable=True),   # nullable=True : donnees brutes peuvent contenir des nulls
-    StructField("customer_id", StringType(),       nullable=True),   # DropNullKeys les rejettera en Silver
-    StructField("product_id",  StringType(),       nullable=True),
-    StructField("quantity",    IntegerType(),      nullable=True),
-    StructField("unit_price",  DecimalType(18, 4), nullable=True),
-    StructField("status",      StringType(),       nullable=True),
-    StructField("order_date",  DateType(),         nullable=True),
-    StructField("channel",     StringType(),       nullable=True),
-])
+RAW_ORDERS_SCHEMA = StructType(
+    [
+        StructField(
+            "order_id", StringType(), nullable=True
+        ),  # nullable=True : donnees brutes peuvent contenir des nulls
+        StructField(
+            "customer_id", StringType(), nullable=True
+        ),  # DropNullKeys les rejettera en Silver
+        StructField("product_id", StringType(), nullable=True),
+        StructField("quantity", IntegerType(), nullable=True),
+        StructField("unit_price", DecimalType(18, 4), nullable=True),
+        StructField("status", StringType(), nullable=True),
+        StructField("order_date", DateType(), nullable=True),
+        StructField("channel", StringType(), nullable=True),
+    ]
+)

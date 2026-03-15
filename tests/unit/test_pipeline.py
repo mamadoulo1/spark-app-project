@@ -16,8 +16,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from src.jobs.base_job import BaseJob
 from src.pipeline.pipeline import (
@@ -29,13 +30,14 @@ from src.pipeline.pipeline import (
 )
 from src.utils.config import AppConfig
 
-
 # =============================================================================
 # Jobs de test — n'accedent pas a Spark
 # =============================================================================
 
+
 class SuccessJob(BaseJob):
     """Job qui reussit toujours (rien a faire)."""
+
     JOB_NAME = "success_job"
 
     def run(self) -> None:
@@ -44,6 +46,7 @@ class SuccessJob(BaseJob):
 
 class FailingJob(BaseJob):
     """Job qui echoue toujours (simule une erreur reseau, source indisponible…)."""
+
     JOB_NAME = "failing_job"
 
     def run(self) -> None:
@@ -64,6 +67,7 @@ def _config() -> AppConfig:
 # Tests de StepResult et StepStatus
 # =============================================================================
 
+
 @pytest.mark.unit
 class TestStepResult:
     """Tests des dataclasses StepResult et StepStatus."""
@@ -79,7 +83,7 @@ class TestStepResult:
 
     def test_step_status_values(self) -> None:
         assert StepStatus.SUCCESS.value == "SUCCESS"
-        assert StepStatus.FAILED.value  == "FAILED"
+        assert StepStatus.FAILED.value == "FAILED"
         assert StepStatus.SKIPPED.value == "SKIPPED"
         assert StepStatus.PENDING.value == "PENDING"
         assert StepStatus.RUNNING.value == "RUNNING"
@@ -88,6 +92,7 @@ class TestStepResult:
 # =============================================================================
 # Tests de PipelineReport
 # =============================================================================
+
 
 @pytest.mark.unit
 class TestPipelineReport:
@@ -118,7 +123,7 @@ class TestPipelineReport:
         ]
         report = PipelineReport("test_pipeline", results)
         assert len(report.steps_success) == 2
-        assert len(report.steps_failed)  == 1
+        assert len(report.steps_failed) == 1
         assert len(report.steps_skipped) == 1
 
     def test_total_elapsed_sums_all_steps(self) -> None:
@@ -142,7 +147,7 @@ class TestPipelineReport:
             StepResult("step_c", StepStatus.SKIPPED),
         ]
         report = PipelineReport("demo", results)
-        report.print_summary()   # Ne doit pas lever d'exception
+        report.print_summary()  # Ne doit pas lever d'exception
         captured = capsys.readouterr()
         assert "demo" in captured.out
         assert "ECHEC" in captured.out
@@ -151,6 +156,7 @@ class TestPipelineReport:
 # =============================================================================
 # Tests de PipelineStep
 # =============================================================================
+
 
 @pytest.mark.unit
 class TestPipelineStep:
@@ -162,19 +168,18 @@ class TestPipelineStep:
         assert step.retry_on_fail is False
 
     def test_with_dependencies(self) -> None:
-        step = PipelineStep("silver", SuccessJob,
-                            dependencies=["bronze"], config=_config())
+        step = PipelineStep("silver", SuccessJob, dependencies=["bronze"], config=_config())
         assert "bronze" in step.dependencies
 
     def test_retry_on_fail_flag(self) -> None:
-        step = PipelineStep("flaky", SuccessJob,
-                            retry_on_fail=True, config=_config())
+        step = PipelineStep("flaky", SuccessJob, retry_on_fail=True, config=_config())
         assert step.retry_on_fail is True
 
 
 # =============================================================================
 # Tests de Pipeline — logique DAG (sans Spark reel)
 # =============================================================================
+
 
 @pytest.mark.unit
 class TestPipelineDagLogic:
@@ -188,9 +193,8 @@ class TestPipelineDagLogic:
 
     def test_nominal_single_step_success(self) -> None:
         """Un pipeline avec un seul step qui reussit."""
-        pipeline = (
-            Pipeline("test_single", spark=_mock_spark())
-            .add_step(PipelineStep("step_a", SuccessJob, config=_config()))
+        pipeline = Pipeline("test_single", spark=_mock_spark()).add_step(
+            PipelineStep("step_a", SuccessJob, config=_config())
         )
         report = pipeline.run()
         assert report.success
@@ -207,7 +211,7 @@ class TestPipelineDagLogic:
         report = pipeline.run()
         assert report.success
         assert len(report.steps_success) == 3
-        assert len(report.steps_failed)  == 0
+        assert len(report.steps_failed) == 0
         assert len(report.steps_skipped) == 0
 
     def test_step_skipped_when_dependency_fails(self) -> None:
@@ -220,15 +224,18 @@ class TestPipelineDagLogic:
         pipeline = (
             Pipeline("test_skip", spark=_mock_spark())
             .add_step(PipelineStep("step_a", FailingJob, config=_config()))
-            .add_step(PipelineStep(
-                "step_b", SuccessJob,
-                dependencies=["step_a"],
-                config=_config(),
-            ))
+            .add_step(
+                PipelineStep(
+                    "step_b",
+                    SuccessJob,
+                    dependencies=["step_a"],
+                    config=_config(),
+                )
+            )
         )
         report = pipeline.run()
         assert not report.success
-        assert report.steps_failed[0].step_name  == "step_a"
+        assert report.steps_failed[0].step_name == "step_a"
         assert report.steps_skipped[0].step_name == "step_b"
 
     def test_fail_fast_skips_all_remaining_steps(self) -> None:
@@ -239,13 +246,11 @@ class TestPipelineDagLogic:
         pipeline = (
             Pipeline("test_failfast", spark=_mock_spark())
             .add_step(PipelineStep("a", FailingJob, config=_config()))
-            .add_step(PipelineStep("b", SuccessJob,
-                                   dependencies=["a"], config=_config()))
-            .add_step(PipelineStep("c", SuccessJob,
-                                   dependencies=["b"], config=_config()))
+            .add_step(PipelineStep("b", SuccessJob, dependencies=["a"], config=_config()))
+            .add_step(PipelineStep("c", SuccessJob, dependencies=["b"], config=_config()))
         )
         report = pipeline.run()
-        assert len(report.steps_failed)  == 1
+        assert len(report.steps_failed) == 1
         assert len(report.steps_skipped) == 2
         assert not report.success
 
@@ -273,13 +278,13 @@ class TestPipelineDagLogic:
         Un step dont la dependance declaree n'existe pas dans le pipeline
         est passe en SKIPPED (dependance non satisfaite).
         """
-        pipeline = (
-            Pipeline("test_missing_dep", spark=_mock_spark())
-            .add_step(PipelineStep(
-                "orphan", SuccessJob,
+        pipeline = Pipeline("test_missing_dep", spark=_mock_spark()).add_step(
+            PipelineStep(
+                "orphan",
+                SuccessJob,
                 dependencies=["nonexistent_step"],
                 config=_config(),
-            ))
+            )
         )
         report = pipeline.run()
         assert len(report.steps_skipped) == 1
@@ -306,29 +311,29 @@ class TestPipelineDagLogic:
                 # 2eme tentative : succes
                 self.metrics.rows_written = 42
 
-        pipeline = (
-            Pipeline("test_retry", spark=_mock_spark())
-            .add_step(PipelineStep(
-                "flaky_step", FlakyJob,
+        pipeline = Pipeline("test_retry", spark=_mock_spark()).add_step(
+            PipelineStep(
+                "flaky_step",
+                FlakyJob,
                 retry_on_fail=True,
                 config=_config(),
-            ))
+            )
         )
         report = pipeline.run()
         assert report.success
-        assert attempt_counter["n"] == 2   # exactement 2 tentatives
+        assert attempt_counter["n"] == 2  # exactement 2 tentatives
 
     def test_retry_exhausted_marks_step_failed(self) -> None:
         """
         Si le step echoue aux deux tentatives, il est marque FAILED.
         """
-        pipeline = (
-            Pipeline("test_retry_fail", spark=_mock_spark())
-            .add_step(PipelineStep(
-                "always_fails", FailingJob,
-                retry_on_fail=True,   # 2 tentatives, les deux echouent
+        pipeline = Pipeline("test_retry_fail", spark=_mock_spark()).add_step(
+            PipelineStep(
+                "always_fails",
+                FailingJob,
+                retry_on_fail=True,  # 2 tentatives, les deux echouent
                 config=_config(),
-            ))
+            )
         )
         report = pipeline.run()
         assert not report.success
@@ -338,13 +343,12 @@ class TestPipelineDagLogic:
         """add_step() retourne self -> permet le chaining fluent."""
         pipeline = Pipeline("chain_test", spark=_mock_spark())
         result = pipeline.add_step(PipelineStep("a", SuccessJob, config=_config()))
-        assert result is pipeline   # meme objet
+        assert result is pipeline  # meme objet
 
     def test_step_result_contains_metrics(self) -> None:
         """Apres un run reussi, le StepResult contient les metriques du job."""
-        pipeline = (
-            Pipeline("test_metrics", spark=_mock_spark())
-            .add_step(PipelineStep("step_a", SuccessJob, config=_config()))
+        pipeline = Pipeline("test_metrics", spark=_mock_spark()).add_step(
+            PipelineStep("step_a", SuccessJob, config=_config())
         )
         report = pipeline.run()
         result = report.steps_success[0]
@@ -353,9 +357,8 @@ class TestPipelineDagLogic:
 
     def test_step_result_contains_error_message_on_failure(self) -> None:
         """Apres un echec, le StepResult contient le message d'erreur."""
-        pipeline = (
-            Pipeline("test_error_msg", spark=_mock_spark())
-            .add_step(PipelineStep("failing", FailingJob, config=_config()))
+        pipeline = Pipeline("test_error_msg", spark=_mock_spark()).add_step(
+            PipelineStep("failing", FailingJob, config=_config())
         )
         report = pipeline.run()
         result = report.steps_failed[0]

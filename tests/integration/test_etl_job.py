@@ -5,6 +5,7 @@ These tests spin up a real (local) SparkSession and exercise the full
 Extract -> Transform -> Validate pipeline against in-memory DataFrames.
 No external storage or Kafka required.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -56,8 +57,18 @@ class TestOrdersEtlJobTransform:
         self, spark: SparkSession, job: OrdersEtlJob, sample_orders_data: list[tuple]
     ) -> None:
         # Statut en minuscules -> doit etre converti en majuscules
-        data = [("ORD-001", "CUST-A", "PROD-X", 2, Decimal("19.99"), "delivered",
-                 datetime.date(2024, 1, 15), "ONLINE")]
+        data = [
+            (
+                "ORD-001",
+                "CUST-A",
+                "PROD-X",
+                2,
+                Decimal("19.99"),
+                "delivered",
+                datetime.date(2024, 1, 15),
+                "ONLINE",
+            )
+        ]
         df = _make_df(spark, data)
         result = job.transform(df)
         row = result.collect()[0]
@@ -68,8 +79,16 @@ class TestOrdersEtlJobTransform:
     ) -> None:
         # Une ligne avec order_id=None doit etre rejetee
         data = list(sample_orders_data) + [
-            (None, "CUST-D", "PROD-W", 1, Decimal("10.00"), "PENDING",
-             datetime.date(2024, 1, 18), "ONLINE")
+            (
+                None,
+                "CUST-D",
+                "PROD-W",
+                1,
+                Decimal("10.00"),
+                "PENDING",
+                datetime.date(2024, 1, 18),
+                "ONLINE",
+            )
         ]
         df = _make_df(spark, data)
         result = job.transform(df)

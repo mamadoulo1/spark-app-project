@@ -1,4 +1,5 @@
 """Unit tests for transformation modules."""
+
 from __future__ import annotations
 
 import pytest
@@ -86,9 +87,7 @@ class TestTrimStrings:
         assert values == ["hello", "world"]
 
     def test_non_string_columns_unchanged(self, spark: SparkSession) -> None:
-        schema = StructType(
-            [StructField("id", IntegerType()), StructField("name", StringType())]
-        )
+        schema = StructType([StructField("id", IntegerType()), StructField("name", StringType())])
         data = [(1, "  alice  "), (2, "bob  ")]
         df = spark.createDataFrame(data, schema)
         result = TrimStrings()(df)
@@ -123,9 +122,9 @@ class TestComputeDerivedColumns:
     def test_multiple_expressions(self, spark: SparkSession) -> None:
         data = [("hello",)]
         df = spark.createDataFrame(data, ["text"])
-        result = ComputeDerivedColumns(
-            {"upper_text": "UPPER(text)", "len_text": "LENGTH(text)"}
-        )(df)
+        result = ComputeDerivedColumns({"upper_text": "UPPER(text)", "len_text": "LENGTH(text)"})(
+            df
+        )
         row = result.collect()[0]
         assert row["upper_text"] == "HELLO"
         assert row["len_text"] == 5

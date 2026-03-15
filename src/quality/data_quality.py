@@ -59,6 +59,7 @@ logger = get_logger(__name__)
 # Severity — niveau de gravite d'un check
 # =============================================================================
 
+
 class Severity(str, Enum):
     """
     Niveau de gravite d'un check de qualite.
@@ -69,6 +70,7 @@ class Severity(str, Enum):
     FAIL : le check echoue -> log une erreur -> assert_no_failures() leve DataQualityError
            Cas d'usage : cles primaires nulles, doublons sur PK, types incorrects
     """
+
     WARN = "warn"
     FAIL = "fail"
 
@@ -76,6 +78,7 @@ class Severity(str, Enum):
 # =============================================================================
 # CheckResult — resultat d'un check individuel
 # =============================================================================
+
 
 @dataclass
 class CheckResult:
@@ -87,18 +90,17 @@ class CheckResult:
 
     Peut etre persiste en Delta Lake pour suivre la tendance de qualite.
     """
-    check_name:    str
-    dataset:       str
-    status:        str        # "PASS" | "FAIL" | "WARN"
-    severity:      Severity
-    total_rows:    int
-    failing_rows:  int
-    passing_rows:  int
-    pass_rate:     float
-    details:       dict[str, Any] = field(default_factory=dict)
-    run_ts:        str = field(
-        default_factory=lambda: datetime.now(tz=timezone.utc).isoformat()
-    )
+
+    check_name: str
+    dataset: str
+    status: str  # "PASS" | "FAIL" | "WARN"
+    severity: Severity
+    total_rows: int
+    failing_rows: int
+    passing_rows: int
+    pass_rate: float
+    details: dict[str, Any] = field(default_factory=dict)
+    run_ts: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).isoformat())
 
     @property
     def passed(self) -> bool:
@@ -108,16 +110,16 @@ class CheckResult:
     def to_dict(self) -> dict[str, Any]:
         """Serialise en dict pour le logging et la persistance Delta."""
         return {
-            "check_name":   self.check_name,
-            "dataset":      self.dataset,
-            "status":       self.status,
-            "severity":     self.severity.value,
-            "total_rows":   self.total_rows,
+            "check_name": self.check_name,
+            "dataset": self.dataset,
+            "status": self.status,
+            "severity": self.severity.value,
+            "total_rows": self.total_rows,
             "failing_rows": self.failing_rows,
             "passing_rows": self.passing_rows,
-            "pass_rate":    round(self.pass_rate, 6),
-            "details":      json.dumps(self.details),
-            "run_ts":       self.run_ts,
+            "pass_rate": round(self.pass_rate, 6),
+            "details": json.dumps(self.details),
+            "run_ts": self.run_ts,
         }
 
     def __str__(self) -> str:
@@ -132,6 +134,7 @@ class CheckResult:
 # BaseCheck — contrat abstrait pour tous les checks
 # =============================================================================
 
+
 class BaseCheck:
     """
     Contrat abstrait pour un check de qualite.
@@ -142,18 +145,17 @@ class BaseCheck:
     """
 
     def __init__(self, name: str, severity: Severity = Severity.FAIL) -> None:
-        self.name     = name
+        self.name = name
         self.severity = severity
 
     def run(self, df: DataFrame, dataset: str) -> CheckResult:
-        raise NotImplementedError(
-            f"{self.__class__.__name__} doit implementer run()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} doit implementer run()")
 
 
 # =============================================================================
 # NotNullCheck
 # =============================================================================
+
 
 class NotNullCheck(BaseCheck):
     """
@@ -174,32 +176,32 @@ class NotNullCheck(BaseCheck):
 
     def __init__(
         self,
-        column:    str,
-        severity:  Severity = Severity.FAIL,
-        threshold: float    = 0.0,
+        column: str,
+        severity: Severity = Severity.FAIL,
+        threshold: float = 0.0,
     ) -> None:
         super().__init__(f"not_null:{column}", severity)
-        self.column    = column
+        self.column = column
         self.threshold = threshold
 
     def run(self, df: DataFrame, dataset: str) -> CheckResult:
-        total   = df.count()
+        total = df.count()
         failing = df.filter(F.col(self.column).isNull()).count()
         null_rate = failing / total if total > 0 else 0.0
-        passed    = null_rate <= self.threshold
+        passed = null_rate <= self.threshold
         return CheckResult(
-            check_name   = self.name,
-            dataset      = dataset,
-            status       = "PASS" if passed else self.severity.value.upper(),
-            severity     = self.severity,
-            total_rows   = total,
-            failing_rows = failing,
-            passing_rows = total - failing,
-            pass_rate    = 1.0 - null_rate,
-            details      = {
-                "column":     self.column,
-                "null_rate":  round(null_rate, 6),
-                "threshold":  self.threshold,
+            check_name=self.name,
+            dataset=dataset,
+            status="PASS" if passed else self.severity.value.upper(),
+            severity=self.severity,
+            total_rows=total,
+            failing_rows=failing,
+            passing_rows=total - failing,
+            pass_rate=1.0 - null_rate,
+            details={
+                "column": self.column,
+                "null_rate": round(null_rate, 6),
+                "threshold": self.threshold,
             },
         )
 
@@ -207,6 +209,7 @@ class NotNullCheck(BaseCheck):
 # =============================================================================
 # UniquenessCheck
 # =============================================================================
+
 
 class UniquenessCheck(BaseCheck):
     """
@@ -225,35 +228,35 @@ class UniquenessCheck(BaseCheck):
 
     def __init__(
         self,
-        columns:   str | list[str],
-        severity:  Severity = Severity.FAIL,
-        threshold: float    = 0.0,
+        columns: str | list[str],
+        severity: Severity = Severity.FAIL,
+        threshold: float = 0.0,
     ) -> None:
         cols = [columns] if isinstance(columns, str) else columns
         super().__init__(f"unique:{','.join(cols)}", severity)
-        self.columns   = cols
+        self.columns = cols
         self.threshold = threshold
 
     def run(self, df: DataFrame, dataset: str) -> CheckResult:
-        total     = df.count()
-        distinct  = df.select(*self.columns).distinct().count()
+        total = df.count()
+        distinct = df.select(*self.columns).distinct().count()
         dup_count = total - distinct
-        dup_rate  = dup_count / total if total > 0 else 0.0
-        passed    = dup_rate <= self.threshold
+        dup_rate = dup_count / total if total > 0 else 0.0
+        passed = dup_rate <= self.threshold
         return CheckResult(
-            check_name   = self.name,
-            dataset      = dataset,
-            status       = "PASS" if passed else self.severity.value.upper(),
-            severity     = self.severity,
-            total_rows   = total,
-            failing_rows = dup_count,
-            passing_rows = distinct,
-            pass_rate    = 1.0 - dup_rate,
-            details      = {
-                "columns":    self.columns,
+            check_name=self.name,
+            dataset=dataset,
+            status="PASS" if passed else self.severity.value.upper(),
+            severity=self.severity,
+            total_rows=total,
+            failing_rows=dup_count,
+            passing_rows=distinct,
+            pass_rate=1.0 - dup_rate,
+            details={
+                "columns": self.columns,
                 "duplicates": dup_count,
-                "dup_rate":   round(dup_rate, 6),
-                "threshold":  self.threshold,
+                "dup_rate": round(dup_rate, 6),
+                "threshold": self.threshold,
             },
         )
 
@@ -261,6 +264,7 @@ class UniquenessCheck(BaseCheck):
 # =============================================================================
 # AcceptedValuesCheck
 # =============================================================================
+
 
 class AcceptedValuesCheck(BaseCheck):
     """
@@ -281,29 +285,29 @@ class AcceptedValuesCheck(BaseCheck):
 
     def __init__(
         self,
-        column:          str,
+        column: str,
         accepted_values: list[Any],
-        severity:        Severity = Severity.WARN,
+        severity: Severity = Severity.WARN,
     ) -> None:
         super().__init__(f"accepted_values:{column}", severity)
-        self.column          = column
+        self.column = column
         self.accepted_values = accepted_values
 
     def run(self, df: DataFrame, dataset: str) -> CheckResult:
-        total   = df.count()
+        total = df.count()
         failing = df.filter(~F.col(self.column).isin(self.accepted_values)).count()
         pass_rate = 1.0 - (failing / total if total > 0 else 0.0)
         return CheckResult(
-            check_name   = self.name,
-            dataset      = dataset,
-            status       = "PASS" if failing == 0 else self.severity.value.upper(),
-            severity     = self.severity,
-            total_rows   = total,
-            failing_rows = failing,
-            passing_rows = total - failing,
-            pass_rate    = pass_rate,
-            details      = {
-                "column":          self.column,
+            check_name=self.name,
+            dataset=dataset,
+            status="PASS" if failing == 0 else self.severity.value.upper(),
+            severity=self.severity,
+            total_rows=total,
+            failing_rows=failing,
+            passing_rows=total - failing,
+            pass_rate=pass_rate,
+            details={
+                "column": self.column,
                 "accepted_values": self.accepted_values,
             },
         )
@@ -312,6 +316,7 @@ class AcceptedValuesCheck(BaseCheck):
 # =============================================================================
 # RowCountCheck
 # =============================================================================
+
 
 class RowCountCheck(BaseCheck):
     """
@@ -340,24 +345,21 @@ class RowCountCheck(BaseCheck):
         self.max_rows = max_rows
 
     def run(self, df: DataFrame, dataset: str) -> CheckResult:
-        total  = df.count()
-        passed = (
-            total >= self.min_rows
-            and (self.max_rows is None or total <= self.max_rows)
-        )
+        total = df.count()
+        passed = total >= self.min_rows and (self.max_rows is None or total <= self.max_rows)
         return CheckResult(
-            check_name   = self.name,
-            dataset      = dataset,
-            status       = "PASS" if passed else self.severity.value.upper(),
-            severity     = self.severity,
-            total_rows   = total,
-            failing_rows = 0 if passed else 1,
-            passing_rows = total if passed else 0,
-            pass_rate    = 1.0 if passed else 0.0,
-            details      = {
-                "actual":    total,
-                "min_rows":  self.min_rows,
-                "max_rows":  self.max_rows,
+            check_name=self.name,
+            dataset=dataset,
+            status="PASS" if passed else self.severity.value.upper(),
+            severity=self.severity,
+            total_rows=total,
+            failing_rows=0 if passed else 1,
+            passing_rows=total if passed else 0,
+            pass_rate=1.0 if passed else 0.0,
+            details={
+                "actual": total,
+                "min_rows": self.min_rows,
+                "max_rows": self.max_rows,
             },
         )
 
@@ -365,6 +367,7 @@ class RowCountCheck(BaseCheck):
 # =============================================================================
 # RangeCheck
 # =============================================================================
+
 
 class RangeCheck(BaseCheck):
     """
@@ -384,36 +387,36 @@ class RangeCheck(BaseCheck):
 
     def __init__(
         self,
-        column:   str,
-        min_val:  float | None = None,
-        max_val:  float | None = None,
+        column: str,
+        min_val: float | None = None,
+        max_val: float | None = None,
         severity: Severity = Severity.FAIL,
     ) -> None:
         super().__init__(f"range:{column}", severity)
-        self.column  = column
+        self.column = column
         self.min_val = min_val
         self.max_val = max_val
 
     def run(self, df: DataFrame, dataset: str) -> CheckResult:
-        total     = df.count()
+        total = df.count()
         condition = F.lit(False)
         if self.min_val is not None:
             condition = condition | (F.col(self.column) < self.min_val)
         if self.max_val is not None:
             condition = condition | (F.col(self.column) > self.max_val)
-        failing   = df.filter(condition).count()
+        failing = df.filter(condition).count()
         pass_rate = 1.0 - (failing / total if total > 0 else 0.0)
         return CheckResult(
-            check_name   = self.name,
-            dataset      = dataset,
-            status       = "PASS" if failing == 0 else self.severity.value.upper(),
-            severity     = self.severity,
-            total_rows   = total,
-            failing_rows = failing,
-            passing_rows = total - failing,
-            pass_rate    = pass_rate,
-            details      = {
-                "column":  self.column,
+            check_name=self.name,
+            dataset=dataset,
+            status="PASS" if failing == 0 else self.severity.value.upper(),
+            severity=self.severity,
+            total_rows=total,
+            failing_rows=failing,
+            passing_rows=total - failing,
+            pass_rate=pass_rate,
+            details={
+                "column": self.column,
                 "min_val": self.min_val,
                 "max_val": self.max_val,
             },
@@ -423,6 +426,7 @@ class RangeCheck(BaseCheck):
 # =============================================================================
 # DataQualityChecker — orchestrateur
 # =============================================================================
+
 
 class DataQualityChecker:
     """
@@ -445,7 +449,7 @@ class DataQualityChecker:
 
     def __init__(self, dataset_name: str) -> None:
         self.dataset_name = dataset_name
-        self._checks:  list[BaseCheck]   = []
+        self._checks: list[BaseCheck] = []
         self._results: list[CheckResult] = []
 
     def add_check(self, check: BaseCheck) -> DataQualityChecker:
@@ -465,19 +469,25 @@ class DataQualityChecker:
             self._results.append(result)
 
             if result.passed:
-                logger.info("DQ check", extra={
-                    "check":   result.check_name,
-                    "status":  result.status,
-                    "dataset": result.dataset,
-                })
+                logger.info(
+                    "DQ check",
+                    extra={
+                        "check": result.check_name,
+                        "status": result.status,
+                        "dataset": result.dataset,
+                    },
+                )
             else:
-                logger.warning("DQ check", extra={
-                    "check":        result.check_name,
-                    "status":       result.status,
-                    "failing_rows": result.failing_rows,
-                    "pass_rate":    f"{result.pass_rate:.1%}",
-                    "dataset":      result.dataset,
-                })
+                logger.warning(
+                    "DQ check",
+                    extra={
+                        "check": result.check_name,
+                        "status": result.status,
+                        "failing_rows": result.failing_rows,
+                        "pass_rate": f"{result.pass_rate:.1%}",
+                        "dataset": result.dataset,
+                    },
+                )
 
         return self._results
 
@@ -496,13 +506,10 @@ class DataQualityChecker:
             logger.warning("Aucun resultat DQ a persister — appeler run() d'abord")
             return
 
-        rows      = [r.to_dict() for r in self._results]
+        rows = [r.to_dict() for r in self._results]
         result_df = spark.createDataFrame(rows)
         result_df.write.mode("append").parquet(output_path)
-        logger.info(
-            "Resultats DQ persistes",
-            extra={"path": output_path, "checks": len(rows)}
-        )
+        logger.info("Resultats DQ persistes", extra={"path": output_path, "checks": len(rows)})
 
     def assert_no_failures(self) -> None:
         """
@@ -513,36 +520,31 @@ class DataQualityChecker:
         Raises:
             DataQualityError : avec la liste de tous les checks en echec.
         """
-        failures = [
-            r for r in self._results
-            if not r.passed and r.severity == Severity.FAIL
-        ]
+        failures = [r for r in self._results if not r.passed and r.severity == Severity.FAIL]
         if failures:
             summary = " | ".join(
-                f"{r.check_name} ({r.failing_rows}/{r.total_rows} lignes)"
-                for r in failures
+                f"{r.check_name} ({r.failing_rows}/{r.total_rows} lignes)" for r in failures
             )
-            raise DataQualityError(
-                f"Echecs qualite sur '{self.dataset_name}' : {summary}"
-            )
+            raise DataQualityError(f"Echecs qualite sur '{self.dataset_name}' : {summary}")
 
     @property
     def summary(self) -> dict[str, Any]:
         """Synthese des resultats : total, passed, failed, pass_rate."""
-        total  = len(self._results)
+        total = len(self._results)
         passed = sum(1 for r in self._results if r.passed)
         return {
-            "dataset":      self.dataset_name,
+            "dataset": self.dataset_name,
             "total_checks": total,
-            "passed":       passed,
-            "failed":       total - passed,
-            "pass_rate":    passed / total if total else 0.0,
+            "passed": passed,
+            "failed": total - passed,
+            "pass_rate": passed / total if total else 0.0,
         }
 
 
 # =============================================================================
 # DataQualityError
 # =============================================================================
+
 
 class DataQualityError(Exception):
     """

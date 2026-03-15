@@ -22,8 +22,8 @@
 
 from __future__ import annotations
 
-from pyspark.sql import SparkSession
 from delta import configure_spark_with_delta_pip
+from pyspark.sql import SparkSession
 
 from src.utils.config import AppConfig
 from src.utils.logger import get_logger
@@ -59,17 +59,16 @@ def get_spark_session(
         # Session minimale pour les tests : local[1] = 1 seul thread
         logger.debug("Creation SparkSession en mode test")
         builder = (
-            SparkSession.builder
-            .appName("test-session")
+            SparkSession.builder.appName("test-session")
             .master("local[1]")
             .config("spark.sql.shuffle.partitions", "1")
-            .config("spark.driver.host",            "127.0.0.1")
-            .config("spark.driver.bindAddress",     "127.0.0.1")
-            .config("spark.ui.enabled",             "false")
-            .config("spark.sql.extensions",
-                    "io.delta.sql.DeltaSparkSessionExtension")
-            .config("spark.sql.catalog.spark_catalog",
-                    "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+            .config("spark.driver.host", "127.0.0.1")
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.ui.enabled", "false")
+            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+            .config(
+                "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+            )
         )
         spark = configure_spark_with_delta_pip(builder).getOrCreate()
         spark.sparkContext.setLogLevel("ERROR")
@@ -78,23 +77,20 @@ def get_spark_session(
     # Session de production / developpement
     logger.debug(
         "Creation SparkSession",
-        extra={"app_name": config.spark.app_name, "master": config.spark.master}
+        extra={"app_name": config.spark.app_name, "master": config.spark.master},
     )
 
     builder = (
-        SparkSession.builder
-        .appName(config.spark.app_name)
+        SparkSession.builder.appName(config.spark.app_name)
         .master(config.spark.master)
-        .config("spark.sql.shuffle.partitions",
-                str(config.spark.shuffle_partitions))
-        .config("spark.sql.adaptive.enabled",
-                str(config.spark.adaptive_query_execution).lower())
-        .config("spark.driver.host",        "127.0.0.1")
+        .config("spark.sql.shuffle.partitions", str(config.spark.shuffle_partitions))
+        .config("spark.sql.adaptive.enabled", str(config.spark.adaptive_query_execution).lower())
+        .config("spark.driver.host", "127.0.0.1")
         .config("spark.driver.bindAddress", "127.0.0.1")
-        .config("spark.sql.extensions",
-                "io.delta.sql.DeltaSparkSessionExtension")
-        .config("spark.sql.catalog.spark_catalog",
-                "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config(
+            "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+        )
     )
 
     for key, value in config.spark.extra_configs.items():
@@ -106,17 +102,17 @@ def get_spark_session(
 
     # Silencer le ShutdownHookManager (message d'erreur cosmétique sur Windows)
     log4j = spark.sparkContext._jvm.org.apache.log4j
-    log4j.LogManager.getLogger(
-        "org.apache.spark.util.ShutdownHookManager"
-    ).setLevel(log4j.Level.OFF)
+    log4j.LogManager.getLogger("org.apache.spark.util.ShutdownHookManager").setLevel(
+        log4j.Level.OFF
+    )
 
     logger.info(
         "SparkSession creee",
         extra={
             "app_name": config.spark.app_name,
-            "master":   config.spark.master,
-            "version":  spark.version,
-        }
+            "master": config.spark.master,
+            "version": spark.version,
+        },
     )
     return spark
 

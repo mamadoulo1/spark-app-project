@@ -92,13 +92,10 @@ class BaseTransformer(ABC):
         """
         logger.debug(
             "Application du transformer",
-            extra={"transformer": self.__class__.__name__, "options": self.options}
+            extra={"transformer": self.__class__.__name__, "options": self.options},
         )
         result = self.transform(df)
-        logger.debug(
-            "Transformer termine",
-            extra={"transformer": self.__class__.__name__}
-        )
+        logger.debug("Transformer termine", extra={"transformer": self.__class__.__name__})
         return result
 
 
@@ -129,6 +126,7 @@ def compose(*transformers: BaseTransformer) -> Callable[[DataFrame], DataFrame]:
             enrichment = compose(CastColumns({...}), AddAuditColumns(...))
             full       = compose(cleaning, enrichment)
     """
+
     def _pipeline(df: DataFrame) -> DataFrame:
         for transformer in transformers:
             df = transformer(df)

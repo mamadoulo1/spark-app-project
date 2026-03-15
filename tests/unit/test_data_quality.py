@@ -1,4 +1,5 @@
 """Unit tests for the data quality module."""
+
 from __future__ import annotations
 
 import pytest

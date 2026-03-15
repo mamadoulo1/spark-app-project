@@ -45,6 +45,7 @@ logger = get_logger(__name__)
 # BaseReader — contrat abstrait
 # =============================================================================
 
+
 class BaseReader(ABC):
     """Contrat abstrait pour tous les readers."""
 
@@ -59,6 +60,7 @@ class BaseReader(ABC):
 # =============================================================================
 # ParquetReader
 # =============================================================================
+
 
 class ParquetReader(BaseReader):
     """
@@ -80,8 +82,8 @@ class ParquetReader(BaseReader):
 
     def read(
         self,
-        path:         str,
-        schema:       StructType | None = None,
+        path: str,
+        schema: StructType | None = None,
         merge_schema: bool = False,
         **kwargs,
     ) -> DataFrame:
@@ -95,6 +97,7 @@ class ParquetReader(BaseReader):
 # =============================================================================
 # CsvReader
 # =============================================================================
+
 
 class CsvReader(BaseReader):
     """
@@ -122,20 +125,19 @@ class CsvReader(BaseReader):
 
     def read(
         self,
-        path:   str,
+        path: str,
         schema: StructType | None = None,
-        sep:    str = ",",
+        sep: str = ",",
         **kwargs,
     ) -> DataFrame:
         reader = (
-            self.spark.read
-            .option("header",          "true")
-            .option("sep",             sep)
-            .option("encoding",        "UTF-8")
-            .option("dateFormat",      "yyyy-MM-dd")
+            self.spark.read.option("header", "true")
+            .option("sep", sep)
+            .option("encoding", "UTF-8")
+            .option("dateFormat", "yyyy-MM-dd")
             .option("timestampFormat", "yyyy-MM-dd HH:mm:ss")
-            .option("mode",            "PERMISSIVE")   # lignes invalides -> NULL
-            .option("inferSchema",     "false")        # JAMAIS inferSchema en prod
+            .option("mode", "PERMISSIVE")  # lignes invalides -> NULL
+            .option("inferSchema", "false")  # JAMAIS inferSchema en prod
         )
         # Appliquer les options supplementaires
         for key, value in kwargs.items():
@@ -149,6 +151,7 @@ class CsvReader(BaseReader):
 # =============================================================================
 # JsonReader
 # =============================================================================
+
 
 class JsonReader(BaseReader):
     """
@@ -165,8 +168,8 @@ class JsonReader(BaseReader):
 
     def read(
         self,
-        path:      str,
-        schema:    StructType | None = None,
+        path: str,
+        schema: StructType | None = None,
         multiline: bool = False,
         **kwargs,
     ) -> DataFrame:
@@ -182,6 +185,7 @@ class JsonReader(BaseReader):
 # =============================================================================
 # DeltaReader
 # =============================================================================
+
 
 class DeltaReader(BaseReader):
     """
@@ -211,20 +215,23 @@ class DeltaReader(BaseReader):
 
     def read(
         self,
-        path:      str,
-        version:   int | None = None,
+        path: str,
+        version: int | None = None,
         timestamp: str | None = None,
         **kwargs,
     ) -> DataFrame:
         reader = self.spark.read.format("delta")
         if version is not None:
             reader = reader.option("versionAsOf", version)
-            logger.info("Lecture Delta (time travel version)",
-                        extra={"path": path, "version": version})
+            logger.info(
+                "Lecture Delta (time travel version)", extra={"path": path, "version": version}
+            )
         elif timestamp is not None:
             reader = reader.option("timestampAsOf", timestamp)
-            logger.info("Lecture Delta (time travel timestamp)",
-                        extra={"path": path, "timestamp": timestamp})
+            logger.info(
+                "Lecture Delta (time travel timestamp)",
+                extra={"path": path, "timestamp": timestamp},
+            )
         else:
             logger.info("Lecture Delta", extra={"path": path})
         return reader.load(path)
@@ -236,9 +243,9 @@ class DeltaReader(BaseReader):
 
 _READER_REGISTRY: dict[str, type[BaseReader]] = {
     "parquet": ParquetReader,
-    "csv":     CsvReader,
-    "json":    JsonReader,
-    "delta":   DeltaReader,
+    "csv": CsvReader,
+    "json": JsonReader,
+    "delta": DeltaReader,
 }
 
 

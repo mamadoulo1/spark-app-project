@@ -52,6 +52,7 @@ logger = get_logger(__name__)
 # StepStatus — cycle de vie d'un step
 # =============================================================================
 
+
 class StepStatus(Enum):
     """
     Etats possibles d'un step de pipeline.
@@ -64,16 +65,18 @@ class StepStatus(Enum):
 
     En Airflow : none / running / success / failed / upstream_failed
     """
+
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     SUCCESS = "SUCCESS"
-    FAILED  = "FAILED"
+    FAILED = "FAILED"
     SKIPPED = "SKIPPED"
 
 
 # =============================================================================
 # PipelineStep — definition d'un step
 # =============================================================================
+
 
 @dataclass
 class PipelineStep:
@@ -94,16 +97,18 @@ class PipelineStep:
             dependencies=["bronze_ingest"],
         )
     """
-    name:          str
-    job_class:     Type[BaseJob]
-    dependencies:  list[str]    = field(default_factory=list)
-    config:        AppConfig | None = None
-    retry_on_fail: bool         = False
+
+    name: str
+    job_class: Type[BaseJob]
+    dependencies: list[str] = field(default_factory=list)
+    config: AppConfig | None = None
+    retry_on_fail: bool = False
 
 
 # =============================================================================
 # StepResult — resultat d'execution d'un step
 # =============================================================================
+
 
 @dataclass
 class StepResult:
@@ -117,16 +122,18 @@ class StepResult:
         error           : Message d'erreur si FAILED.
         elapsed_seconds : Duree d'execution du step (overhead pipeline inclus).
     """
-    step_name:       str
-    status:          StepStatus
-    metrics:         JobMetrics | None = None
-    error:           str        | None = None
-    elapsed_seconds: float             = 0.0
+
+    step_name: str
+    status: StepStatus
+    metrics: JobMetrics | None = None
+    error: str | None = None
+    elapsed_seconds: float = 0.0
 
 
 # =============================================================================
 # PipelineReport — rapport d'execution du pipeline complet
 # =============================================================================
+
 
 class PipelineReport:
     """
@@ -139,12 +146,12 @@ class PipelineReport:
     """
 
     def __init__(self, pipeline_name: str, results: list[StepResult]) -> None:
-        self.pipeline_name   = pipeline_name
-        self.results         = results
-        self.total_elapsed   = sum(r.elapsed_seconds for r in results)
-        self.steps_success   = [r for r in results if r.status == StepStatus.SUCCESS]
-        self.steps_failed    = [r for r in results if r.status == StepStatus.FAILED]
-        self.steps_skipped   = [r for r in results if r.status == StepStatus.SKIPPED]
+        self.pipeline_name = pipeline_name
+        self.results = results
+        self.total_elapsed = sum(r.elapsed_seconds for r in results)
+        self.steps_success = [r for r in results if r.status == StepStatus.SUCCESS]
+        self.steps_failed = [r for r in results if r.status == StepStatus.FAILED]
+        self.steps_skipped = [r for r in results if r.status == StepStatus.SKIPPED]
 
     @property
     def success(self) -> bool:
@@ -164,10 +171,10 @@ class PipelineReport:
 
         for r in self.results:
             rows = "-"
-            dq   = "-"
+            dq = "-"
             if r.metrics:
                 rows = str(r.metrics.rows_written)
-                dq   = f"{r.metrics.dq_checks_passed}/{r.metrics.dq_checks_passed + r.metrics.dq_checks_failed}"
+                dq = f"{r.metrics.dq_checks_passed}/{r.metrics.dq_checks_passed + r.metrics.dq_checks_failed}"
 
             status_display = r.status.value
             print(f"  {r.step_name:<28}  {status_display:<8}  {rows:>7}  {dq:>6}")
@@ -189,6 +196,7 @@ class PipelineReport:
 # =============================================================================
 # Pipeline — orchestrateur principal
 # =============================================================================
+
 
 class Pipeline:
     """
@@ -220,7 +228,7 @@ class Pipeline:
     """
 
     def __init__(self, name: str, spark: SparkSession | None = None) -> None:
-        self.name   = name
+        self.name = name
         self._spark = spark
         self._steps: list[PipelineStep] = []
 
@@ -245,10 +253,7 @@ class Pipeline:
         """
         effective_spark = spark or self._spark
 
-        logger.info(
-            "Pipeline demarre",
-            extra={"pipeline": self.name, "steps": len(self._steps)}
-        )
+        logger.info("Pipeline demarre", extra={"pipeline": self.name, "steps": len(self._steps)})
 
         results: dict[str, StepResult] = {}
 
@@ -260,7 +265,7 @@ class Pipeline:
             if result.status == StepStatus.FAILED:
                 logger.error(
                     "Pipeline interrompu apres echec",
-                    extra={"pipeline": self.name, "failed_step": step.name}
+                    extra={"pipeline": self.name, "failed_step": step.name},
                 )
                 # Marquer les steps restants comme SKIPPED
                 for remaining in self._steps:
@@ -278,21 +283,21 @@ class Pipeline:
             "Pipeline termine",
             extra={
                 "pipeline": self.name,
-                "success":  report.success,
-                "elapsed":  report.total_elapsed,
-                "passed":   len(report.steps_success),
-                "failed":   len(report.steps_failed),
-                "skipped":  len(report.steps_skipped),
-            }
+                "success": report.success,
+                "elapsed": report.total_elapsed,
+                "passed": len(report.steps_success),
+                "failed": len(report.steps_failed),
+                "skipped": len(report.steps_skipped),
+            },
         )
 
         return report
 
     def _run_step(
         self,
-        step:     PipelineStep,
-        results:  dict[str, StepResult],
-        spark:    SparkSession | None,
+        step: PipelineStep,
+        results: dict[str, StepResult],
+        spark: SparkSession | None,
     ) -> StepResult:
         """Execute un step en verifiant ses dependances."""
 
@@ -302,7 +307,7 @@ class Pipeline:
             if dep_result is None or dep_result.status != StepStatus.SUCCESS:
                 logger.warning(
                     "Step saute : dependance non satisfaite",
-                    extra={"step": step.name, "dependency": dep_name}
+                    extra={"step": step.name, "dependency": dep_name},
                 )
                 return StepResult(
                     step_name=step.name,
@@ -327,10 +332,10 @@ class Pipeline:
                 logger.info(
                     "Step termine",
                     extra={
-                        "step":    step.name,
+                        "step": step.name,
                         "elapsed": round(elapsed, 3),
-                        "rows":    metrics.rows_written,
-                    }
+                        "rows": metrics.rows_written,
+                    },
                 )
                 return StepResult(
                     step_name=step.name,
@@ -344,12 +349,11 @@ class Pipeline:
                 if attempt < max_attempts:
                     logger.warning(
                         "Step echoue, nouvelle tentative",
-                        extra={"step": step.name, "attempt": attempt, "error": str(exc)}
+                        extra={"step": step.name, "attempt": attempt, "error": str(exc)},
                     )
                 else:
                     logger.error(
-                        "Step echoue definitivement",
-                        extra={"step": step.name, "error": str(exc)}
+                        "Step echoue definitivement", extra={"step": step.name, "error": str(exc)}
                     )
                     return StepResult(
                         step_name=step.name,

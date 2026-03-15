@@ -49,24 +49,42 @@ class StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         # Champs de base toujours presents
         log_entry = {
-            "timestamp": datetime.fromtimestamp(
-                record.created, tz=timezone.utc
-            ).strftime("%Y-%m-%dT%H:%M:%S.") + f"{record.msecs:03.0f}Z",
-            "level":    record.levelname,
-            "logger":   record.name,
-            "message":  record.getMessage(),
-            "module":   record.module,
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%S."
+            )
+            + f"{record.msecs:03.0f}Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
             "function": record.funcName,
-            "line":     record.lineno,
+            "line": record.lineno,
         }
 
         # Ajouter les champs extra passes par l'appelant
         # (on exclut les attributs internes de LogRecord)
         _internal_attrs = {
-            "name", "msg", "args", "levelname", "levelno", "pathname",
-            "filename", "module", "exc_info", "exc_text", "stack_info",
-            "lineno", "funcName", "created", "msecs", "relativeCreated",
-            "thread", "threadName", "processName", "process", "message",
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
             "taskName",
         }
         for key, value in record.__dict__.items():
@@ -90,11 +108,11 @@ class TextFormatter(logging.Formatter):
     """
 
     LEVEL_COLORS = {
-        "DEBUG":    "\033[36m",   # cyan
-        "INFO":     "\033[32m",   # vert
-        "WARNING":  "\033[33m",   # jaune
-        "ERROR":    "\033[31m",   # rouge
-        "CRITICAL": "\033[35m",   # magenta
+        "DEBUG": "\033[36m",  # cyan
+        "INFO": "\033[32m",  # vert
+        "WARNING": "\033[33m",  # jaune
+        "ERROR": "\033[31m",  # rouge
+        "CRITICAL": "\033[35m",  # magenta
     }
     RESET = "\033[0m"
 
@@ -106,16 +124,30 @@ class TextFormatter(logging.Formatter):
 
         # Extraire les champs extra
         _internal_attrs = {
-            "name", "msg", "args", "levelname", "levelno", "pathname",
-            "filename", "module", "exc_info", "exc_text", "stack_info",
-            "lineno", "funcName", "created", "msecs", "relativeCreated",
-            "thread", "threadName", "processName", "process", "message",
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
             "taskName",
         }
-        extras = {
-            k: v for k, v in record.__dict__.items()
-            if k not in _internal_attrs
-        }
+        extras = {k: v for k, v in record.__dict__.items() if k not in _internal_attrs}
         extra_str = "  |  " + "  ".join(f"{k}={v}" for k, v in extras.items()) if extras else ""
 
         # Colorisation (seulement si le terminal le supporte)

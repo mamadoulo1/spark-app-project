@@ -36,6 +36,7 @@ logger = get_logger(__name__)
 # 1. TrimStrings
 # =============================================================================
 
+
 class TrimStrings(BaseTransformer):
     """
     Supprime les espaces (et autres whitespace) en debut et fin de toutes
@@ -54,22 +55,18 @@ class TrimStrings(BaseTransformer):
 
     def transform(self, df: DataFrame) -> DataFrame:
         string_columns = [
-            field.name
-            for field in df.schema.fields
-            if isinstance(field.dataType, StringType)
+            field.name for field in df.schema.fields if isinstance(field.dataType, StringType)
         ]
         for col_name in string_columns:
             df = df.withColumn(col_name, F.trim(F.col(col_name)))
-        logger.debug(
-            "TrimStrings applique",
-            extra={"colonnes_traitees": len(string_columns)}
-        )
+        logger.debug("TrimStrings applique", extra={"colonnes_traitees": len(string_columns)})
         return df
 
 
 # =============================================================================
 # 2. DropDuplicates
 # =============================================================================
+
 
 class DropDuplicates(BaseTransformer):
     """
@@ -97,13 +94,10 @@ class DropDuplicates(BaseTransformer):
     def transform(self, df: DataFrame) -> DataFrame:
         before = df.count()
         result = df.dropDuplicates(self.subset) if self.subset else df.dropDuplicates()
-        after  = result.count()
+        after = result.count()
         dropped = before - after
         if dropped > 0:
-            logger.warning(
-                "Doublons supprimes",
-                extra={"dropped": dropped, "subset": self.subset}
-            )
+            logger.warning("Doublons supprimes", extra={"dropped": dropped, "subset": self.subset})
         else:
             logger.debug("Aucun doublon detecte", extra={"subset": self.subset})
         return result
@@ -112,6 +106,7 @@ class DropDuplicates(BaseTransformer):
 # =============================================================================
 # 3. DropNullKeys
 # =============================================================================
+
 
 class DropNullKeys(BaseTransformer):
     """
@@ -142,13 +137,13 @@ class DropNullKeys(BaseTransformer):
 
         before = df.count()
         result = df.filter(~null_condition)
-        after  = result.count()
+        after = result.count()
         dropped = before - after
 
         if dropped > 0:
             logger.warning(
                 "Lignes avec cles NULL supprimees",
-                extra={"dropped": dropped, "key_columns": self.key_columns}
+                extra={"dropped": dropped, "key_columns": self.key_columns},
             )
         return result
 
@@ -156,6 +151,7 @@ class DropNullKeys(BaseTransformer):
 # =============================================================================
 # 4. CastColumns
 # =============================================================================
+
 
 class CastColumns(BaseTransformer):
     """
@@ -189,21 +185,16 @@ class CastColumns(BaseTransformer):
         for col_name, target_type in self.cast_map.items():
             if col_name in existing_columns:
                 df = df.withColumn(col_name, F.col(col_name).cast(target_type))
-                logger.debug(
-                    "Colonne castee",
-                    extra={"colonne": col_name, "type": target_type}
-                )
+                logger.debug("Colonne castee", extra={"colonne": col_name, "type": target_type})
             else:
-                logger.debug(
-                    "Colonne absente, cast ignore",
-                    extra={"colonne": col_name}
-                )
+                logger.debug("Colonne absente, cast ignore", extra={"colonne": col_name})
         return df
 
 
 # =============================================================================
 # 5. RenameColumns
 # =============================================================================
+
 
 class RenameColumns(BaseTransformer):
     """
@@ -236,6 +227,7 @@ class RenameColumns(BaseTransformer):
 # 6. NormaliseStrings
 # =============================================================================
 
+
 class NormaliseStrings(BaseTransformer):
     """
     Normalise la casse des colonnes string specifiees.
@@ -253,11 +245,11 @@ class NormaliseStrings(BaseTransformer):
     def __init__(
         self,
         columns: list[str] | None = None,
-        case:    str = "upper",
+        case: str = "upper",
     ) -> None:
         super().__init__(columns=columns, case=case)
         self.columns = columns
-        self.case    = case.lower()
+        self.case = case.lower()
 
     def transform(self, df: DataFrame) -> DataFrame:
         target_columns = self.columns or [
@@ -275,6 +267,7 @@ class NormaliseStrings(BaseTransformer):
 # =============================================================================
 # 7. ComputeDerivedColumns
 # =============================================================================
+
 
 class ComputeDerivedColumns(BaseTransformer):
     """
@@ -306,16 +299,14 @@ class ComputeDerivedColumns(BaseTransformer):
     def transform(self, df: DataFrame) -> DataFrame:
         for col_name, expr_str in self.expressions.items():
             df = df.withColumn(col_name, F.expr(expr_str))
-            logger.debug(
-                "Colonne calculee",
-                extra={"colonne": col_name, "expression": expr_str}
-            )
+            logger.debug("Colonne calculee", extra={"colonne": col_name, "expression": expr_str})
         return df
 
 
 # =============================================================================
 # 8. FilterRows
 # =============================================================================
+
 
 class FilterRows(BaseTransformer):
     """
@@ -337,15 +328,15 @@ class FilterRows(BaseTransformer):
     def transform(self, df: DataFrame) -> DataFrame:
         before = df.count()
         result = df.filter(F.expr(self.condition))
-        after  = result.count()
+        after = result.count()
         logger.debug(
             "Lignes filtrees",
             extra={
                 "condition": self.condition,
-                "avant":     before,
-                "apres":     after,
-                "filtrees":  before - after,
-            }
+                "avant": before,
+                "apres": after,
+                "filtrees": before - after,
+            },
         )
         return result
 
@@ -353,6 +344,7 @@ class FilterRows(BaseTransformer):
 # =============================================================================
 # 9. AddAuditColumns
 # =============================================================================
+
 
 class AddAuditColumns(BaseTransformer):
     """
@@ -377,12 +369,11 @@ class AddAuditColumns(BaseTransformer):
     def __init__(self, pipeline_name: str, env: str = "dev") -> None:
         super().__init__(pipeline_name=pipeline_name, env=env)
         self.pipeline_name = pipeline_name
-        self.env           = env
+        self.env = env
 
     def transform(self, df: DataFrame) -> DataFrame:
         return (
-            df
-            .withColumn("_processing_ts",  F.current_timestamp())
-            .withColumn("_pipeline_name",  F.lit(self.pipeline_name))
-            .withColumn("_env",            F.lit(self.env))
+            df.withColumn("_processing_ts", F.current_timestamp())
+            .withColumn("_pipeline_name", F.lit(self.pipeline_name))
+            .withColumn("_env", F.lit(self.env))
         )
